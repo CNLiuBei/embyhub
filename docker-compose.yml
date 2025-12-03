@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:14-alpine
+    container_name: embyhub-postgres
+    environment:
+      POSTGRES_DB: embyhub
+      POSTGRES_USER: embyhub
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-embyhub123}
+      TZ: Asia/Shanghai
+    ports:
+      - "${DB_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - embyhub-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U embyhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: embyhub-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - embyhub-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Emby Hub 主服务（前后端合一）
+  embyhub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: embyhub:latest
+    container_name: embyhub-app
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${APP_PORT:-28080}:8080"
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - embyhub-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  embyhub-network:
+    driver: bridge

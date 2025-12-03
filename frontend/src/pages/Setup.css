@@ -1,0 +1,151 @@
+/* 安装向导页面样式 */
+.setup-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: url('../assets/wallpaper.jpg') center center / cover no-repeat fixed;
+  padding: 20px;
+}
+
+.setup-container::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.2);
+  z-index: 0;
+}
+
+.setup-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 700px;
+  border-radius: 20px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2) !important;
+  border: none !important;
+}
+
+.setup-card .ant-card-body {
+  padding: 40px;
+}
+
+.setup-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.setup-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+.setup-steps {
+  margin-bottom: 40px;
+}
+
+.setup-steps .ant-steps-item-icon {
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%) !important;
+  border: none !important;
+}
+
+.setup-steps .ant-steps-item-finish .ant-steps-item-icon {
+  background: #52c41a !important;
+}
+
+.setup-content {
+  min-height: 350px;
+}
+
+.step-content {
+  text-align: center;
+}
+
+.step-icon {
+  font-size: 60px;
+  margin-bottom: 16px;
+}
+
+.step-content h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1d1d1f;
+}
+
+.step-desc {
+  color: #666;
+  margin-bottom: 24px;
+}
+
+.step-content .ant-form {
+  max-width: 400px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.step-tip {
+  background: #e7f3ff;
+  color: #004085;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin: 16px 0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.step-tip code {
+  background: rgba(0, 122, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-item-half {
+  flex: 1;
+}
+
+.setup-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.setup-footer .ant-btn {
+  min-width: 100px;
+}
+
+/* 响应式 */
+@media (max-width: 540px) {
+  .setup-card .ant-card-body {
+    padding: 24px;
+  }
+  
+  .setup-header h1 {
+    font-size: 22px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .setup-steps {
+    display: none;
+  }
+}

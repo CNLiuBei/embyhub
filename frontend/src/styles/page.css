@@ -1,0 +1,117 @@
+/* ========== 通用页面样式 ========== */
+
+/* 页面头部 */
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.page-header p {
+  color: #86868b;
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+/* 页面操作栏 */
+.page-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 搜索框 */
+.search-input {
+  width: 280px;
+}
+
+/* 筛选区域 */
+.filter-section {
+  background: #f5f5f7;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+/* 统计卡片 */
+.stat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.stat-card-content h3 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin: 0;
+  line-height: 1;
+}
+
+.stat-card-content p {
+  font-size: 13px;
+  color: #86868b;
+  margin: 4px 0 0 0;
+}
+
+/* 操作按钮组 */
+.action-btn {
+  padding: 4px 12px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .page-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-input {
+    width: 100%;
+  }
+}
