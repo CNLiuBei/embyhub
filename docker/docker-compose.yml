@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: feiniu-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: fnuser
+      POSTGRES_PASSWORD: fnuser123
+      POSTGRES_DB: feiniu_user
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fnuser -d feiniu_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: feiniu-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 主服务
+  server:
+    image: feiniu-server:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    container_name: feiniu-server
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=fnuser
+      - DB_PASSWORD=fnuser123
+      - DB_NAME=feiniu_user
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./config:/app/config
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    ports:
+      - "54680:54680"
+
+  # Emby代理服务
+  emby-proxy:
+    image: feiniu-emby-proxy:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.emby-proxy
+    container_name: feiniu-emby-proxy
+    restart: always
+    depends_on:
+      - server
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=fnuser
+      - DB_PASSWORD=fnuser123
+      - DB_NAME=feiniu_user
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./config:/app/config
+      - logs_data:/app/logs
+    ports:
+      - "54682:54682"
+
+  # Nginx 前端
+  nginx:
+    image: nginx:alpine
+    container_name: feiniu-nginx
+    restart: always
+    depends_on:
+      - server
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ../dist/feiniu-user-system/frontend:/usr/share/nginx/html
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  logs_data:

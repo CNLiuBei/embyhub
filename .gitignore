@@ -1,0 +1,74 @@
+# 依赖目录
+node_modules/
+vendor/
+
+# 构建输出
+dist/
+dist-docker/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 编译的二进制文件
+backend/backend
+backend/server
+backend/emby-proxy
+backend/main
+server
+
+# Go 安装包
+*.tar.gz
+
+# 日志文件
+*.log
+logs/
+backend/logs/
+frontend/logs/
+
+# 缓存
+cache/
+backend/cache/
+.cache/
+
+# 备份
+backups/
+backend/backups/
+
+# 上传文件
+uploads/
+backend/uploads/
+backend/static/wallpaper/
+
+# 本地配置
+backend/config/config.yaml
+config/config.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 测试覆盖率
+coverage/
+*.cover
+*.out
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# Docker 相关
+docker/data/
+data/

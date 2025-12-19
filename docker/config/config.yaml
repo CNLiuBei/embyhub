@@ -1,0 +1,94 @@
+# 飞牛用户系统配置文件 (Docker版)
+
+server:
+  port: 54680
+  mode: release
+  read_timeout: 10
+  write_timeout: 10
+
+# PostgreSQL 数据库配置
+database:
+  driver: postgres
+  host: postgres
+  port: 5432
+  user: fnuser
+  password: fnuser123
+  dbname: feiniu_user
+  sslmode: disable
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+# Redis 缓存配置
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 100
+
+# JWT 配置
+jwt:
+  secret: "emby-user-system-jwt-secret-key-2024-change-me"
+  access_expire: 7200
+  refresh_expire: 604800
+  issuer: "emby-user-system"
+
+# 日志配置
+log:
+  level: info
+  filename: logs/app.log
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: true
+
+# 安全配置
+security:
+  aes_key: "emby2024secretkey32bytes!!!"
+  rate_limit:
+    login: 5
+    api: 60
+  password_min_length: 8
+
+# 文件上传配置
+upload:
+  avatar_path: ./uploads/avatars
+  max_size: 5242880
+  allowed_types:
+    - image/jpeg
+    - image/png
+    - image/gif
+
+# 会员等级配置
+member:
+  levels:
+    - id: 0
+      name: "普通用户"
+      watch_limit: 3
+      ad_free: false
+      quality_4k: false
+    - id: 1
+      name: "白银会员"
+      watch_limit: 10
+      ad_free: false
+      quality_4k: false
+    - id: 2
+      name: "黄金会员"
+      watch_limit: 50
+      ad_free: true
+      quality_4k: false
+    - id: 3
+      name: "钻石会员"
+      watch_limit: -1
+      ad_free: true
+      quality_4k: true
+
+# Emby API配置 - 请修改为你的Emby服务器地址
+emby:
+  enabled: true
+  mode: "emby"
+  base_url: "http://YOUR_EMBY_IP:8096"
+  api_key: "YOUR_EMBY_API_KEY"
+  admin_user: "admin"
+  admin_pass: "admin123"
