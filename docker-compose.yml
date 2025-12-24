@@ -1,63 +1,86 @@
 version: '3.8'
 
 services:
-  # 后端服务
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=embyuser
-      - DB_PASS=embyuser123
-      - DB_NAME=emby_user
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./backend/logs:/app/logs
-      - ./backend/uploads:/app/uploads
-    restart: unless-stopped
-
-  # 前端服务
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
   # PostgreSQL 数据库
   postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
+    container_name: embyhub-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: embyuser
-      POSTGRES_PASSWORD: embyuser123
-      POSTGRES_DB: emby_user
+      POSTGRES_USER: ${DB_USER:-embyhub}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-embyhub123}
+      POSTGRES_DB: ${DB_NAME:-embyhub}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
+    networks:
+      - embyhub-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-embyhub}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Redis 缓存
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    container_name: embyhub-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    networks:
+      - embyhub-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端服务
+  backend:
+    image: ghcr.io/cnliubei/embyhub-backend:latest
+    container_name: embyhub-backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-embyhub}
+      - DB_PASSWORD=${DB_PASSWORD:-embyhub123}
+      - DB_NAME=${DB_NAME:-embyhub}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    volumes:
+      - ./backend/config:/app/config
+      - ./backend/logs:/app/logs
+      - ./backend/uploads:/app/uploads
+      - ./backend/bin:/app/bin
+    ports:
+      - "54680:8080"
+    networks:
+      - embyhub-network
+
+  # 前端服务
+  frontend:
+    image: ghcr.io/cnliubei/embyhub-frontend:latest
+    container_name: embyhub-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "54681:80"
+    networks:
+      - embyhub-network
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  embyhub-network:
+    driver: bridge
