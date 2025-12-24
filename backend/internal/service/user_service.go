@@ -388,7 +388,7 @@ func (s *UserService) Register(req *RegisterRequest, ip string) (*models.User, e
 
 	// 根据设置赠送会员天数
 	if registerSettings != nil && registerSettings.GiftMemberDays > 0 {
-		memberExpire := time.Now().AddDate(0, 0, registerSettings.GiftMemberDays)
+		memberExpire := time.Now().AddDate(0, 0, int(registerSettings.GiftMemberDays))
 		user.MemberLevel = models.MemberMonth // 赠送月卡会员
 		user.MemberExpire = &memberExpire
 		user.Role = models.RoleMember // 升级为会员用户
