@@ -1,13 +1,13 @@
 version: '3.8'
 
-# EmbyHub Docker 部署配置
-# 使用方法: docker compose up -d
+# 从二进制部署迁移到Docker镜像部署
+# 保留现有的 PostgreSQL 和 Redis 数据
 
 services:
-  # PostgreSQL 数据库
+  # PostgreSQL 数据库 - 保持不变
   postgres:
     image: postgres:15-alpine
-    container_name: embyhub-postgres
+    container_name: feiniu-postgres
     restart: always
     environment:
       POSTGRES_USER: fnuser
@@ -15,29 +15,33 @@ services:
       POSTGRES_DB: feiniu_user
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
     networks:
-      - embyhub-network
+      - feiniu-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fnuser -d feiniu_user"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis 缓存
+  # Redis 缓存 - 保持不变
   redis:
     image: redis:7-alpine
-    container_name: embyhub-redis
+    container_name: feiniu-redis
     restart: always
     command: redis-server --appendonly yes
     volumes:
       - ./data/redis:/data
+    ports:
+      - "16379:6379"
     networks:
-      - embyhub-network
+      - feiniu-network
 
-  # 后端服务
+  # 后端服务 - 使用Docker镜像
   backend:
     image: ghcr.io/cnliubei/embyhub-backend:latest
-    container_name: embyhub-backend
+    container_name: feiniu-backend
     restart: always
     depends_on:
       postgres:
@@ -52,20 +56,20 @@ services:
     ports:
       - "54680:8080"
     networks:
-      - embyhub-network
+      - feiniu-network
 
-  # 前端服务
+  # 前端服务 - 使用Docker镜像
   frontend:
     image: ghcr.io/cnliubei/embyhub-frontend:latest
-    container_name: embyhub-frontend
+    container_name: feiniu-frontend
     restart: always
     depends_on:
       - backend
     ports:
       - "54681:80"
     networks:
-      - embyhub-network
+      - feiniu-network
 
 networks:
-  embyhub-network:
+  feiniu-network:
     driver: bridge

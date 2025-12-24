@@ -1,166 +1,171 @@
-# Emby用户管理系统
+# EmbyHub - Emby用户管理系统
 
-基于 React + Go + PostgreSQL + Redis 技术栈开发的Emby用户管理系统。
+基于 React + Go + PostgreSQL + Redis 的 Emby 用户管理系统，支持会员管理、卡密系统、支付宝支付、闲管家对接等功能。
 
-## 技术栈
+## 功能特性
 
-### 后端
-- Go 1.21+
-- Gin Web框架
-- GORM ORM
-- PostgreSQL 15+
-- Redis 7+
-- JWT认证
-- Zap日志
+- 🎬 **Emby 集成** - 自动同步用户到 Emby，支持设备管理、会话控制
+- 👥 **用户管理** - 注册登录、个人中心、邀请好友
+- 💳 **会员系统** - 卡密兑换、支付宝购买、积分兑换
+- 🎫 **卡密管理** - 批量生成、导出、外部API对接
+- 🛒 **闲管家对接** - 虚拟货源自动发货
+- 💬 **社区功能** - 论坛、私信、关注
+- 🔒 **安全特性** - JWT认证、接口限流、IP黑名单
 
-### 前端
-- React 18
-- TypeScript
-- Redux Toolkit
-- React Query
-- Ant Design v5
-- Tailwind CSS
-- Vite
+## 快速部署 (Docker)
 
-## 功能模块
-
-### 用户端
-- 用户登录/注册(支持账号或邮箱)
-- 个人信息管理
-- 密码修改
-- 会员中心(卡密兑换)
-- 观影记录
-- 收藏管理
-
-### 管理后台
-- 数据统计概览
-- 用户列表(分页/筛选/批量操作)
-- 卡密管理(批量生成/查询/禁用/导出)
-- 操作日志审计
-
-### 会员体系
-- **普通用户**: 基础功能
-- **月卡用户**: 30天会员权益
-- **年卡用户**: 365天会员权益
-
-## 快速开始
-
-### 1. 环境要求
-- Go 1.21+
-- Node.js 18+
-- PostgreSQL 15+
-- Redis 7+
-
-### 2. 配置数据库
-
-```sql
--- 创建数据库和用户
-CREATE DATABASE emby_user;
-CREATE USER embyuser WITH PASSWORD 'embyuser123';
-GRANT ALL PRIVILEGES ON DATABASE emby_user TO embyuser;
-```
-
-修改 `backend/config/config.yaml` 中的数据库连接配置。
-
-### 3. 初始化项目
+### 1. 创建目录
 
 ```bash
-cd emby-user-system
-chmod +x start.sh
-./start.sh init
+mkdir -p embyhub && cd embyhub
+mkdir -p config logs uploads bin data/postgres data/redis
+```
+
+### 2. 下载配置文件
+
+```bash
+# 下载 docker-compose.yml
+curl -O https://raw.githubusercontent.com/CNLiuBei/embyhub/main/docker/docker-compose.simple.yml
+mv docker-compose.simple.yml docker-compose.yml
+
+# 下载示例配置
+curl -o config/config.yaml https://raw.githubusercontent.com/CNLiuBei/embyhub/main/backend/config/config.example.yaml
+```
+
+### 3. 修改配置
+
+编辑 `config/config.yaml`，主要修改：
+
+```yaml
+# JWT密钥（必须修改为随机字符串）
+jwt:
+  secret: "your-random-secret-key-change-this"
+
+# Emby配置（修改为你的Emby服务器）
+emby:
+  enabled: true
+  base_url: "http://YOUR_EMBY_IP:8096"
+  api_key: "YOUR_EMBY_API_KEY"
 ```
 
 ### 4. 启动服务
 
 ```bash
-./start.sh start
+docker compose up -d
 ```
 
 ### 5. 访问系统
 
-- 前端: http://localhost:3000
-- 后端API: http://localhost:8080/api/v1
-- 健康检查: http://localhost:8080/health
+- 前端：http://localhost:54681
+- 后端：http://localhost:54680
+- 默认管理员：`admin` / `Admin123!`
+
+## 升级方法
+
+```bash
+cd embyhub
+
+# 拉取最新镜像
+docker compose pull
+
+# 重启服务（数据会保留）
+docker compose down
+docker compose up -d
+```
+
+## 常用命令
+
+```bash
+# 查看日志
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# 重启服务
+docker compose restart
+
+# 停止服务
+docker compose down
+
+# 查看状态
+docker compose ps
+```
+
+## 数据备份
+
+```bash
+# 备份数据库
+docker exec embyhub-postgres pg_dump -U fnuser feiniu_user > backup.sql
+
+# 恢复数据库
+cat backup.sql | docker exec -i embyhub-postgres psql -U fnuser feiniu_user
+```
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 后端 | Go 1.21+, Gin, GORM |
+| 前端 | React 18, TypeScript, Ant Design |
+| 数据库 | PostgreSQL 15 |
+| 缓存 | Redis 7 |
+| 部署 | Docker, GitHub Actions |
 
 ## 项目结构
 
 ```
-emby-user-system/
-├── backend/                    # Go后端
-│   ├── cmd/server/            # 入口
-│   ├── config/                # 配置文件
-│   ├── internal/
-│   │   ├── config/            # 配置解析
-│   │   ├── database/          # 数据库连接
-│   │   ├── handler/           # HTTP处理器
-│   │   ├── middleware/        # 中间件
-│   │   ├── models/            # 数据模型
-│   │   ├── router/            # 路由
-│   │   └── service/           # 业务逻辑
-│   └── pkg/
-│       ├── auth/              # JWT认证
-│       ├── response/          # 响应格式
-│       └── utils/             # 工具函数
-├── frontend/                   # React前端
-│   ├── src/
-│   │   ├── layouts/           # 布局组件
-│   │   ├── pages/             # 页面
-│   │   ├── services/          # API服务
-│   │   └── store/             # Redux状态
-│   ├── package.json
-│   └── vite.config.ts
-├── start.sh                    # 启动脚本
-└── README.md
+embyhub/
+├── backend/                # Go后端
+│   ├── cmd/server/        # 入口
+│   ├── config/            # 配置
+│   └── internal/          # 业务代码
+├── frontend/              # React前端
+│   └── src/
+├── docker/                # Docker配置
+└── docs/                  # 文档
 ```
 
-## API接口
+## API文档
 
 ### 公开接口
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | /api/v1/user/login | 用户登录(账号/邮箱) |
+| POST | /api/v1/user/login | 用户登录 |
 | POST | /api/v1/user/register | 用户注册 |
-| POST | /api/v1/user/refresh-token | 刷新Token |
+| POST | /api/v1/card/renew | 卡密续费 |
 
 ### 用户接口 (需认证)
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | /api/v1/user/info | 获取用户信息 |
-| PUT | /api/v1/user/update | 更新用户信息 |
-| PUT | /api/v1/user/password | 修改密码 |
-| POST | /api/v1/user/logout | 退出登录 |
-
-### 卡密接口 (需认证)
-| 方法 | 路径 | 说明 |
-|------|------|------|
 | POST | /api/v1/card/redeem | 兑换卡密 |
-| GET | /api/v1/card/history | 兑换记录 |
+| GET | /api/v1/member/info | 会员信息 |
 
-### 管理员接口 (需管理员权限)
+### 管理接口 (需管理员)
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | /api/v1/admin/user/list | 用户列表 |
-| GET | /api/v1/admin/user/:id | 用户详情 |
-| PUT | /api/v1/admin/user/:id/status | 修改状态 |
 | POST | /api/v1/admin/card/batch | 批量生成卡密 |
-| GET | /api/v1/admin/card/list | 卡密列表 |
-| GET | /api/v1/admin/card/export | 导出卡密 |
 | GET | /api/v1/admin/stat/user | 用户统计 |
 
-## 安全特性
+## 外部API对接
 
-- 密码 bcrypt 加盐哈希存储
-- JWT Token 认证
-- 接口限流 (登录5次/分钟，API 60次/分钟)
+### 闲管家虚拟货源
+系统支持闲管家虚拟货源对接，可在管理后台配置商户信息和商品映射。
 
-## 默认账户
+### 外部卡密API
+提供外部卡密获取接口，支持第三方系统调用：
+```
+GET /api/external/card/fetch?api_key=xxx&type=month
+```
 
-执行 `backend/scripts/init.sql` 初始化后：
+## 环境变量
 
-| 角色 | 账号 | 邮箱 | 密码 |
-|------|------|------|------|
-| 管理员 | admin | admin@emby.local | Admin123! |
-| 普通用户 | testuser | user@emby.local | User123! |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| DB_HOST | 数据库地址 | postgres |
+| DB_USER | 数据库用户 | fnuser |
+| DB_PASSWORD | 数据库密码 | fnuser123 |
+| REDIS_HOST | Redis地址 | redis |
 
 ## License
 
