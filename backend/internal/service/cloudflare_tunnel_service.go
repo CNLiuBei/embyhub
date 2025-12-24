@@ -75,32 +75,36 @@ func (s *CloudflareTunnelService) GetConfig() (*CloudflareTunnelConfig, error) {
 	return &config, nil
 }
 
-// CheckCloudflaredInstalled 检查 cloudflared 是否安装（优先检查项目内置的）
+// CheckCloudflaredInstalled 检查 cloudflared 是否安装（优先检查系统级的）
 func (s *CloudflareTunnelService) CheckCloudflaredInstalled() (bool, string) {
-	// 优先检查项目内置的 cloudflared
+	// 优先检查系统安装的 cloudflared
+	cmd := exec.Command("cloudflared", "--version")
+	output, err := cmd.Output()
+	if err == nil {
+		return true, strings.TrimSpace(string(output))
+	}
+
+	// 检查项目内置的 cloudflared
 	if s.manager.IsInstalled() {
 		version, err := s.manager.GetVersion()
 		if err == nil {
 			return true, version
 		}
 	}
-	
-	// 检查系统安装的 cloudflared
-	cmd := exec.Command("cloudflared", "--version")
-	output, err := cmd.Output()
-	if err != nil {
-		return false, ""
-	}
-	return true, strings.TrimSpace(string(output))
+
+	return false, ""
 }
 
 // getCloudflaredPath 获取 cloudflared 可执行文件路径
 func (s *CloudflareTunnelService) getCloudflaredPath() string {
-	// 优先使用项目内置的
+	// 优先使用系统安装的
+	if _, err := exec.LookPath("cloudflared"); err == nil {
+		return "cloudflared"
+	}
+	// 回退到项目内置的
 	if s.manager.IsInstalled() {
 		return s.manager.GetBinPath()
 	}
-	// 回退到系统安装的
 	return "cloudflared"
 }
 
@@ -135,75 +139,166 @@ func (s *CloudflareTunnelService) GetCloudflaredVersion() (string, error) {
 }
 
 
-// CreateTunnelRequest 创建隧道请求
-type CreateTunnelRequest struct {
-	TunnelName string `json:"tunnel_name" binding:"required"` // 隧道名称
-	Domain     string `json:"domain" binding:"required"`      // 主域名
-	Subdomain  string `json:"subdomain" binding:"required"`   // 子域名前缀
-	LocalPort  int    `json:"local_port"`                     // 本地端口，默认 54680
+// LoginResult 登录结果
+type LoginResult struct {
+	Success  bool   `json:"success"`
+	AuthURL  string `json:"auth_url,omitempty"`  // 授权URL（需要用户在浏览器中打开）
+	Message  string `json:"message,omitempty"`
 }
 
-// Login 执行登录（会弹出浏览器）
-func (s *CloudflareTunnelService) Login() error {
+// Login 执行登录（返回授权URL让用户在浏览器中打开）
+func (s *CloudflareTunnelService) Login() (*LoginResult, error) {
 	// 检查 cloudflared 是否安装
 	installed, _ := s.CheckCloudflaredInstalled()
 	if !installed {
-		return errors.New("cloudflared 未安装，请先下载 cloudflared")
+		return nil, errors.New("cloudflared 未安装")
 	}
 
-	// 如果已登录，直接返回
+	// 如果已登录，直接返回成功
 	if s.CheckLoginStatus() {
-		return nil
+		return &LoginResult{Success: true, Message: "已授权"}, nil
 	}
 
-	// 执行登录命令，会自动弹出浏览器
+	// 执行登录命令，捕获输出获取授权URL
 	cfPath := s.getCloudflaredPath()
-	cmd := exec.Command(cfPath, "tunnel", "login")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, cfPath, "tunnel", "login")
 	
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("登录失败: %w", err)
+	// 捕获 stderr（授权URL会输出到这里）
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("创建管道失败: %w", err)
 	}
 
-	// 再次检查登录状态
-	if !s.CheckLoginStatus() {
-		return errors.New("登录未完成，请在浏览器中完成授权")
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("启动登录命令失败: %w", err)
 	}
 
-	return nil
+	// 读取输出，查找授权URL
+	var authURL string
+	scanner := bufio.NewScanner(stderr)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// cloudflared 会输出类似: Please open the following URL and log in with your Cloudflare account: https://dash.cloudflare.com/argotunnel?...
+		if strings.Contains(line, "https://dash.cloudflare.com") {
+			// 提取URL
+			parts := strings.Split(line, " ")
+			for _, part := range parts {
+				if strings.HasPrefix(part, "https://") {
+					authURL = part
+					break
+				}
+			}
+		}
+		if authURL != "" {
+			break
+		}
+	}
+
+	// 不等待命令完成，让它在后台运行等待用户授权
+	go func() {
+		cmd.Wait()
+	}()
+
+	if authURL != "" {
+		return &LoginResult{
+			Success: false,
+			AuthURL: authURL,
+			Message: "请在浏览器中打开授权链接完成 Cloudflare 授权",
+		}, nil
+	}
+
+	return nil, errors.New("无法获取授权URL，请检查网络连接")
 }
 
-// CreateTunnel 创建隧道（如果未登录会自动弹出浏览器登录）
-func (s *CloudflareTunnelService) CreateTunnel(req *CreateTunnelRequest) (*CloudflareTunnelConfig, error) {
+// CreateTunnelResult 创建隧道结果
+type CreateTunnelResult struct {
+	Config      *CloudflareTunnelConfig `json:"config,omitempty"`
+	NeedAuth    bool                    `json:"need_auth"`
+	AuthURL     string                  `json:"auth_url,omitempty"`
+	Message     string                  `json:"message,omitempty"`
+}
+
+// CreateTunnelRequest 创建隧道请求
+type CreateTunnelRequest struct {
+	TunnelName string `json:"tunnel_name" binding:"required"`
+	Domain     string `json:"domain" binding:"required"`
+	Subdomain  string `json:"subdomain" binding:"required"`
+	LocalPort  int    `json:"local_port"`
+}
+
+// CreateTunnel 创建隧道（如果未授权返回授权URL）
+func (s *CloudflareTunnelService) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelResult, error) {
 	s.tunnelMutex.Lock()
 	defer s.tunnelMutex.Unlock()
 
 	// 检查 cloudflared 是否安装
 	installed, _ := s.CheckCloudflaredInstalled()
 	if !installed {
-		return nil, errors.New("cloudflared 未安装，请先下载 cloudflared")
+		return nil, errors.New("cloudflared 未安装")
 	}
 
 	cfPath := s.getCloudflaredPath()
 
-	// 检查是否已登录，如果未登录则自动执行登录
+	// 检查是否已登录，如果未登录则返回授权URL
 	if !s.CheckLoginStatus() {
-		// 执行登录命令，会自动弹出浏览器
-		cmd := exec.Command(cfPath, "tunnel", "login")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		
-		if err := cmd.Run(); err != nil {
-			return nil, fmt.Errorf("Cloudflare 登录失败: %w", err)
+		// 执行登录命令，捕获输出获取授权URL
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, cfPath, "tunnel", "login")
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return nil, fmt.Errorf("创建管道失败: %w", err)
 		}
 
-		// 再次检查登录状态
-		if !s.CheckLoginStatus() {
-			return nil, errors.New("登录未完成，请在浏览器中完成 Cloudflare 授权后重试")
+		if err := cmd.Start(); err != nil {
+			return nil, fmt.Errorf("启动登录命令失败: %w", err)
 		}
+
+		// 读取输出，查找授权URL
+		var authURL string
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, "https://dash.cloudflare.com") || strings.Contains(line, "https://") {
+				parts := strings.Split(line, " ")
+				for _, part := range parts {
+					if strings.HasPrefix(part, "https://") {
+						authURL = part
+						break
+					}
+				}
+			}
+			if authURL != "" {
+				break
+			}
+		}
+
+		// 让登录命令在后台继续运行等待用户授权
+		go func() {
+			cmd.Wait()
+		}()
+
+		if authURL != "" {
+			return &CreateTunnelResult{
+				NeedAuth: true,
+				AuthURL:  authURL,
+				Message:  "请在新窗口中完成 Cloudflare 授权，授权完成后会自动创建隧道",
+			}, nil
+		}
+
+		return nil, errors.New("无法获取授权URL，请检查网络连接")
 	}
 
+	// 已授权，继续创建隧道
+	return s.doCreateTunnel(req, cfPath)
+}
+
+// doCreateTunnel 实际创建隧道的逻辑
+func (s *CloudflareTunnelService) doCreateTunnel(req *CreateTunnelRequest, cfPath string) (*CreateTunnelResult, error) {
 	// 设置默认端口
 	if req.LocalPort == 0 {
 		req.LocalPort = 54680
@@ -226,9 +321,7 @@ func (s *CloudflareTunnelService) CreateTunnel(req *CreateTunnelRequest) (*Cloud
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// 检查是否是隧道已存在
-		if strings.Contains(string(output), "already exists") {
-			// 尝试获取已存在的隧道信息
-		} else {
+		if !strings.Contains(string(output), "already exists") {
 			return nil, fmt.Errorf("创建隧道失败: %s", string(output))
 		}
 	}
@@ -263,9 +356,7 @@ ingress:
 	cmd = exec.Command(cfPath, "tunnel", "route", "dns", req.TunnelName, fullDomain)
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		// DNS 路由可能已存在，忽略错误
 		if !strings.Contains(string(output), "already exists") {
-			// 记录警告但不失败
 			fmt.Printf("DNS 路由配置警告: %s\n", string(output))
 		}
 	}
@@ -283,7 +374,6 @@ ingress:
 		CredPath:   credPath,
 	}
 
-	// 使用 upsert
 	if existingConfig.ID > 0 {
 		config.ID = existingConfig.ID
 		if err := s.db.Save(&config).Error; err != nil {
@@ -295,7 +385,11 @@ ingress:
 		}
 	}
 
-	return &config, nil
+	return &CreateTunnelResult{
+		Config:   &config,
+		NeedAuth: false,
+		Message:  "隧道创建成功",
+	}, nil
 }
 
 // getTunnelID 获取隧道 ID

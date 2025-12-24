@@ -149,26 +149,52 @@ const AlipaySettings = () => {
     },
   })
 
-  // 创建隧道
+  // 创建隧道（自动处理授权流程）
+  const [pendingTunnelData, setPendingTunnelData] = useState<{ tunnel_name: string; domain: string; subdomain: string; local_port?: number } | null>(null)
+  const [isWaitingAuth, setIsWaitingAuth] = useState(false)
+
   const createTunnelMutation = useMutation({
     mutationFn: (data: { tunnel_name: string; domain: string; subdomain: string; local_port?: number }) =>
       tunnelApi.createTunnel(data),
-    onSuccess: () => {
-      message.success('隧道创建成功')
-      queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
-      setTunnelModalOpen(false)
-      tunnelForm.resetFields()
+    onSuccess: (response) => {
+      const data = response.data.data
+      if (data.need_auth && data.auth_url) {
+        // 需要授权，保存当前表单数据，打开授权页面
+        setPendingTunnelData(tunnelForm.getFieldsValue())
+        setIsWaitingAuth(true)
+        window.open(data.auth_url, '_blank')
+        message.info('请在新窗口中完成 Cloudflare 授权，授权完成后会自动创建隧道')
+      } else {
+        // 创建成功
+        message.success('隧道创建成功')
+        queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
+        setTunnelModalOpen(false)
+        tunnelForm.resetFields()
+        setPendingTunnelData(null)
+        setIsWaitingAuth(false)
+      }
     },
     onError: (err: Error) => {
       // 即使报错也刷新状态，因为可能是超时但实际已成功
       queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
       message.error(err.message || '创建隧道失败')
+      setIsWaitingAuth(false)
     },
     onSettled: () => {
       // 无论成功失败都刷新状态
       queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
     },
   })
+
+  // 监听授权状态变化，授权完成后自动重试创建隧道
+  useEffect(() => {
+    if (isWaitingAuth && tunnelStatus?.logged_in && pendingTunnelData) {
+      // 授权完成，自动重试创建隧道
+      setIsWaitingAuth(false)
+      message.info('授权成功，正在创建隧道...')
+      createTunnelMutation.mutate(pendingTunnelData)
+    }
+  }, [tunnelStatus?.logged_in, isWaitingAuth, pendingTunnelData])
 
   // 启动隧道
   const startTunnelMutation = useMutation({
@@ -215,6 +241,25 @@ const AlipaySettings = () => {
     },
     onError: (err: Error) => {
       message.error(err.message || '下载失败')
+    },
+  })
+
+  // Cloudflare 授权
+  const loginMutation = useMutation({
+    mutationFn: () => tunnelApi.login(),
+    onSuccess: (response) => {
+      const data = response.data.data
+      if (data.logged_in) {
+        message.success('已完成 Cloudflare 授权')
+        queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
+      } else if (data.auth_url) {
+        // 在新窗口打开授权URL
+        window.open(data.auth_url, '_blank')
+        message.info('请在新窗口中完成 Cloudflare 授权，授权完成后点击刷新状态')
+      }
+    },
+    onError: (err: Error) => {
+      message.error(err.message || '获取授权链接失败')
     },
   })
 
@@ -628,7 +673,7 @@ const AlipaySettings = () => {
           {/* 隧道状态说明 */}
           <Alert
             message="Cloudflare 隧道说明"
-            description="支付宝异步通知需要公网可访问的回调地址。通过 Cloudflare Tunnel 可以将本地服务暴露到公网，无需公网IP或端口映射。点击创建隧道后会自动弹出浏览器进行 Cloudflare 授权。"
+            description="支付宝异步通知需要公网可访问的回调地址。通过 Cloudflare Tunnel 可以将本地服务暴露到公网，无需公网IP或端口映射。"
             type="info"
             showIcon
             className="mb-4"
@@ -648,7 +693,17 @@ const AlipaySettings = () => {
                 {tunnelStatus?.logged_in ? (
                   <Badge status="success" text="已授权" />
                 ) : (
-                  <Badge status="default" text="未授权（创建隧道时自动授权）" />
+                  <Space>
+                    <Badge status="warning" text="未授权" />
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => loginMutation.mutate()}
+                      loading={loginMutation.isPending}
+                    >
+                      点击授权
+                    </Button>
+                  </Space>
                 )}
               </Descriptions.Item>
               <Descriptions.Item label="隧道配置">
@@ -667,21 +722,34 @@ const AlipaySettings = () => {
               </Descriptions.Item>
             </Descriptions>
 
-            {!tunnelStatus?.installed && (
-              <div className="mt-4">
+            {/* 操作按钮 */}
+            <div className="mt-4 flex gap-2">
+              {!tunnelStatus?.installed && (
                 <Button
                   type="primary"
                   icon={<DownloadOutlined />}
                   onClick={() => downloadCloudflaredMutation.mutate()}
                   loading={downloadCloudflaredMutation.isPending}
                 >
-                  {downloadCloudflaredMutation.isPending ? '正在下载 cloudflared...' : '下载 cloudflared'}
+                  {downloadCloudflaredMutation.isPending ? '正在下载...' : '下载 cloudflared'}
                 </Button>
-                <div className="mt-2 text-gray-500 text-sm">
-                  点击按钮自动下载 cloudflared 到项目目录，无需手动安装
-                </div>
-              </div>
-            )}
+              )}
+              {tunnelStatus?.installed && !tunnelStatus?.logged_in && (
+                <Button
+                  type="primary"
+                  onClick={() => loginMutation.mutate()}
+                  loading={loginMutation.isPending}
+                >
+                  授权 Cloudflare
+                </Button>
+              )}
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })}
+              >
+                刷新状态
+              </Button>
+            </div>
           </Card>
 
           {/* 隧道配置 */}
@@ -885,6 +953,8 @@ const AlipaySettings = () => {
         onCancel={() => {
           setTunnelModalOpen(false)
           tunnelForm.resetFields()
+          setPendingTunnelData(null)
+          setIsWaitingAuth(false)
         }}
         footer={null}
         width={500}
@@ -894,14 +964,23 @@ const AlipaySettings = () => {
           description={
             <div>
               <p>1. 请确保您已在 Cloudflare 中添加了对应的域名</p>
-              <p>2. 点击创建后会自动弹出浏览器进行 Cloudflare 授权（如未授权）</p>
-              <p>3. 在浏览器中选择要使用的域名并完成授权</p>
+              <p>2. 如果未授权 Cloudflare，创建隧道时会自动弹出授权页面</p>
+              <p>3. 授权完成后会自动继续创建隧道</p>
             </div>
           }
           type="info"
           showIcon
           className="mb-4"
         />
+        {isWaitingAuth && (
+          <Alert
+            message="等待授权"
+            description="请在新窗口中完成 Cloudflare 授权，授权完成后会自动创建隧道"
+            type="warning"
+            showIcon
+            className="mb-4"
+          />
+        )}
         <Form
           form={tunnelForm}
           layout="vertical"
@@ -914,7 +993,7 @@ const AlipaySettings = () => {
             rules={[{ required: true, message: '请输入隧道名称' }]}
             extra="用于标识隧道，建议使用英文"
           >
-            <Input placeholder="如：alipay-callback" />
+            <Input placeholder="如：alipay-callback" disabled={isWaitingAuth} />
           </Form.Item>
 
           <Form.Item
@@ -923,7 +1002,7 @@ const AlipaySettings = () => {
             rules={[{ required: true, message: '请输入主域名' }]}
             extra="您在 Cloudflare 中托管的域名"
           >
-            <Input placeholder="如：example.com" />
+            <Input placeholder="如：example.com" disabled={isWaitingAuth} />
           </Form.Item>
 
           <Form.Item
@@ -932,7 +1011,7 @@ const AlipaySettings = () => {
             rules={[{ required: true, message: '请输入子域名前缀' }]}
             extra="最终域名将是: 子域名.主域名"
           >
-            <Input placeholder="如：pay" addonAfter=".您的域名" />
+            <Input placeholder="如：pay" addonAfter=".您的域名" disabled={isWaitingAuth} />
           </Form.Item>
 
           <Form.Item
@@ -941,7 +1020,7 @@ const AlipaySettings = () => {
             rules={[{ required: true, message: '请输入本地端口' }]}
             extra="后端服务运行的端口"
           >
-            <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+            <InputNumber min={1} max={65535} style={{ width: '100%' }} disabled={isWaitingAuth} />
           </Form.Item>
 
           <Form.Item className="mb-0 mt-6">
@@ -949,15 +1028,17 @@ const AlipaySettings = () => {
               <Button onClick={() => {
                 setTunnelModalOpen(false)
                 tunnelForm.resetFields()
+                setPendingTunnelData(null)
+                setIsWaitingAuth(false)
               }}>
                 取消
               </Button>
               <Button
                 type="primary"
                 htmlType="submit"
-                loading={createTunnelMutation.isPending}
+                loading={createTunnelMutation.isPending || isWaitingAuth}
               >
-                创建隧道
+                {isWaitingAuth ? '等待授权...' : '创建隧道'}
               </Button>
             </Space>
           </Form.Item>

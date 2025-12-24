@@ -21,8 +21,9 @@ FROM alpine:3.19
 
 WORKDIR /app
 
-# 安装时区数据
-RUN apk --no-cache add ca-certificates tzdata
+# 安装时区数据和 cloudflared
+RUN apk --no-cache add ca-certificates tzdata \
+    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community cloudflared
 
 # 设置时区
 ENV TZ=Asia/Shanghai

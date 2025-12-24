@@ -549,6 +549,7 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 		admin.GET("/tunnel/status", cloudflareTunnelHandler.GetStatus)
 		admin.GET("/tunnel/config", cloudflareTunnelHandler.GetConfig)
 		admin.POST("/tunnel/download", cloudflareTunnelHandler.DownloadCloudflared) // 下载 cloudflared
+		admin.POST("/tunnel/login", cloudflareTunnelHandler.Login)                  // 获取授权URL
 		admin.POST("/tunnel/create", cloudflareTunnelHandler.CreateTunnel)
 		admin.POST("/tunnel/start", cloudflareTunnelHandler.StartTunnel)
 		admin.POST("/tunnel/stop", cloudflareTunnelHandler.StopTunnel)

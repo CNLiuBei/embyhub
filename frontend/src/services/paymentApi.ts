@@ -195,9 +195,13 @@ export const tunnelApi = {
   downloadCloudflared: () =>
     api.post<{ code: number; message: string; data: { path: string } }>('/admin/tunnel/download', {}, { timeout: 300000 }),
 
-  // 创建隧道（超时5分钟，因为需要等待浏览器授权）
+  // 获取 Cloudflare 授权URL
+  login: () =>
+    api.post<{ code: number; data: { logged_in: boolean; auth_url?: string; message?: string } }>('/admin/tunnel/login', {}, { timeout: 60000 }),
+
+  // 创建隧道（可能返回授权URL或配置）
   createTunnel: (data: { tunnel_name: string; domain: string; subdomain: string; local_port?: number }) =>
-    api.post<{ code: number; data: TunnelConfig }>('/admin/tunnel/create', data, { timeout: 300000 }),
+    api.post<{ code: number; data: { need_auth: boolean; auth_url?: string; config?: TunnelConfig; message?: string } }>('/admin/tunnel/create', data, { timeout: 60000 }),
 
   // 启动隧道
   startTunnel: () =>

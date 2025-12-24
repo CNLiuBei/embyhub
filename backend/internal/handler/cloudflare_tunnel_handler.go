@@ -85,13 +85,28 @@ func (h *CloudflareTunnelHandler) CreateTunnel(c *gin.Context) {
 		return
 	}
 
-	config, err := h.tunnelService.CreateTunnel(&req)
+	result, err := h.tunnelService.CreateTunnel(&req)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	response.Success(c, config)
+	// 如果需要授权，返回授权URL
+	if result.NeedAuth {
+		response.Success(c, gin.H{
+			"need_auth": true,
+			"auth_url":  result.AuthURL,
+			"message":   result.Message,
+		})
+		return
+	}
+
+	// 创建成功，返回配置
+	response.Success(c, gin.H{
+		"need_auth": false,
+		"config":    result.Config,
+		"message":   result.Message,
+	})
 }
 
 // StartTunnel 启动隧道
@@ -128,4 +143,27 @@ func (h *CloudflareTunnelHandler) DeleteTunnel(c *gin.Context) {
 		return
 	}
 	response.SuccessWithMessage(c, "隧道已删除", nil)
+}
+
+// Login 获取 Cloudflare 授权URL
+func (h *CloudflareTunnelHandler) Login(c *gin.Context) {
+	result, err := h.tunnelService.Login()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if result.Success {
+		response.SuccessWithMessage(c, result.Message, gin.H{
+			"logged_in": true,
+		})
+		return
+	}
+
+	// 返回授权URL
+	response.Success(c, gin.H{
+		"logged_in": false,
+		"auth_url":  result.AuthURL,
+		"message":   result.Message,
+	})
 }
