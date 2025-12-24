@@ -161,8 +161,13 @@ func (s *CloudflareTunnelService) Login() (*LoginResult, error) {
 
 	// 执行登录命令，捕获输出获取授权URL
 	cfPath := s.getCloudflaredPath()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	
+	// 使用可取消的上下文，但不设置超时，让命令持续运行等待用户授权
+	// 用户授权完成后 cloudflared 会自动退出
+	ctx, cancel := context.WithCancel(context.Background())
+	s.tunnelMutex.Lock()
+	s.cancelFunc = cancel // 保存取消函数，以便后续可以取消
+	s.tunnelMutex.Unlock()
 
 	cmd := exec.CommandContext(ctx, cfPath, "tunnel", "login")
 	
@@ -176,30 +181,47 @@ func (s *CloudflareTunnelService) Login() (*LoginResult, error) {
 		return nil, fmt.Errorf("启动登录命令失败: %w", err)
 	}
 
-	// 读取输出，查找授权URL
+	// 读取输出，查找授权URL（设置30秒超时只用于读取URL）
 	var authURL string
-	scanner := bufio.NewScanner(stderr)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// cloudflared 会输出类似: Please open the following URL and log in with your Cloudflare account: https://dash.cloudflare.com/argotunnel?...
-		if strings.Contains(line, "https://dash.cloudflare.com") {
-			// 提取URL
-			parts := strings.Split(line, " ")
-			for _, part := range parts {
-				if strings.HasPrefix(part, "https://") {
-					authURL = part
-					break
+	urlChan := make(chan string, 1)
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			// cloudflared 会输出类似: Please open the following URL and log in with your Cloudflare account: https://dash.cloudflare.com/argotunnel?...
+			if strings.Contains(line, "https://dash.cloudflare.com") || strings.Contains(line, "https://login.cloudflareaccess.org") {
+				// 提取URL
+				parts := strings.Split(line, " ")
+				for _, part := range parts {
+					if strings.HasPrefix(part, "https://") {
+						urlChan <- part
+						return
+					}
 				}
 			}
 		}
-		if authURL != "" {
-			break
+		close(urlChan)
+	}()
+
+	// 等待获取URL，最多30秒
+	select {
+	case url, ok := <-urlChan:
+		if ok {
+			authURL = url
 		}
+	case <-time.After(30 * time.Second):
+		cancel()
+		return nil, errors.New("获取授权URL超时")
 	}
 
-	// 不等待命令完成，让它在后台运行等待用户授权
+	// 让登录命令在后台继续运行，等待用户完成授权
+	// cloudflared 会在用户授权后自动下载 cert.pem 并退出
 	go func() {
 		cmd.Wait()
+		// 命令完成后清理取消函数
+		s.tunnelMutex.Lock()
+		s.cancelFunc = nil
+		s.tunnelMutex.Unlock()
 	}()
 
 	if authURL != "" {
@@ -244,9 +266,9 @@ func (s *CloudflareTunnelService) CreateTunnel(req *CreateTunnelRequest) (*Creat
 
 	// 检查是否已登录，如果未登录则返回授权URL
 	if !s.CheckLoginStatus() {
-		// 执行登录命令，捕获输出获取授权URL
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
+		// 使用可取消的上下文，不设置超时
+		ctx, cancel := context.WithCancel(context.Background())
+		s.cancelFunc = cancel
 
 		cmd := exec.CommandContext(ctx, cfPath, "tunnel", "login")
 		stderr, err := cmd.StderrPipe()
@@ -258,23 +280,35 @@ func (s *CloudflareTunnelService) CreateTunnel(req *CreateTunnelRequest) (*Creat
 			return nil, fmt.Errorf("启动登录命令失败: %w", err)
 		}
 
-		// 读取输出，查找授权URL
+		// 读取输出，查找授权URL（设置30秒超时只用于读取URL）
 		var authURL string
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, "https://dash.cloudflare.com") || strings.Contains(line, "https://") {
-				parts := strings.Split(line, " ")
-				for _, part := range parts {
-					if strings.HasPrefix(part, "https://") {
-						authURL = part
-						break
+		urlChan := make(chan string, 1)
+		go func() {
+			scanner := bufio.NewScanner(stderr)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.Contains(line, "https://dash.cloudflare.com") || strings.Contains(line, "https://login.cloudflareaccess.org") {
+					parts := strings.Split(line, " ")
+					for _, part := range parts {
+						if strings.HasPrefix(part, "https://") {
+							urlChan <- part
+							return
+						}
 					}
 				}
 			}
-			if authURL != "" {
-				break
+			close(urlChan)
+		}()
+
+		// 等待获取URL，最多30秒
+		select {
+		case url, ok := <-urlChan:
+			if ok {
+				authURL = url
 			}
+		case <-time.After(30 * time.Second):
+			cancel()
+			return nil, errors.New("获取授权URL超时")
 		}
 
 		// 让登录命令在后台继续运行等待用户授权
