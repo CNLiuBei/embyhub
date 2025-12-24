@@ -10,6 +10,7 @@ import AdminLayout from './layouts/AdminLayout'
 import UserLayout from './layouts/UserLayout'
 
 // 页面组件（懒加载）
+const Home = lazy(() => import('./pages/Home'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
@@ -89,6 +90,7 @@ function App() {
           <Suspense fallback={<PageLoading />}>
           <Routes>
           {/* 公开路由 */}
+          <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot" element={<ForgotPassword />} />
@@ -146,8 +148,8 @@ function App() {
             <Route path="settings" element={<Settings />} />
           </Route>
           
-            {/* 默认重定向 */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* 默认重定向到首页 */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
         </BrowserRouter>
