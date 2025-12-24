@@ -1,19 +1,16 @@
 # 飞牛影视用户管理系统 - 后端 Dockerfile
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24.11-alpine AS builder
 
 WORKDIR /app
 
 # 安装依赖
 RUN apk add --no-cache git
 
-# 复制go.mod和go.sum
-COPY go.mod go.sum ./
-RUN go mod download
-
 # 复制源码
 COPY . .
 
-# 编译
+# 下载依赖并编译
+RUN go mod tidy && go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
 
 # 运行镜像
