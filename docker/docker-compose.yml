@@ -61,6 +61,7 @@ services:
       - ./config:/app/config
       - uploads_data:/app/uploads
       - logs_data:/app/logs
+      - cloudflared_data:/root/.cloudflared
     ports:
       - "54680:54680"
 
@@ -106,3 +107,4 @@ volumes:
   redis_data:
   uploads_data:
   logs_data:
+  cloudflared_data:

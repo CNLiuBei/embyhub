@@ -60,8 +60,35 @@ services:
       - ./backend/logs:/app/logs
       - ./backend/uploads:/app/uploads
       - ./backend/bin:/app/bin
+      - cloudflared_data:/root/.cloudflared
     ports:
       - "54680:8080"
+    networks:
+      - embyhub-network
+
+  # Emby代理服务
+  emby-proxy:
+    image: ghcr.io/cnliubei/embyhub-emby-proxy:latest
+    container_name: embyhub-emby-proxy
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-embyhub}
+      - DB_PASSWORD=${DB_PASSWORD:-embyhub123}
+      - DB_NAME=${DB_NAME:-embyhub}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./backend/config:/app/config
+      - ./backend/logs:/app/logs
+    ports:
+      - "54682:54682"
     networks:
       - embyhub-network
 
@@ -80,6 +107,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  cloudflared_data:
 
 networks:
   embyhub-network:
