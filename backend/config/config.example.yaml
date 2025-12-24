@@ -1,0 +1,105 @@
+# Emby用户管理系统配置文件
+
+server:
+  port: 54680
+  mode: debug  # debug, release, test
+  read_timeout: 10
+  write_timeout: 10
+
+# PostgreSQL 数据库配置
+database:
+  host: localhost
+  port: 5432
+  user: fnuser
+  password: your_password
+  dbname: feiniu_user
+  sslmode: disable
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+# Redis 缓存配置
+redis:
+  host: localhost
+  port: 6379
+  password: your_password
+  db: 0
+  pool_size: 100
+
+# JWT 配置
+jwt:
+  secret: your_secret
+  access_expire: 7200      # 访问令牌过期时间(秒) 2小时
+  refresh_expire: 604800   # 刷新令牌过期时间(秒) 7天
+  issuer: "emby-user-system"
+
+# 日志配置
+log:
+  level: info        # debug, info, warn, error
+  filename: logs/app.log
+  max_size: 100      # MB
+  max_backups: 10
+  max_age: 30        # 天
+  compress: true
+
+# 安全配置
+security:
+  aes_key: "emby2024secretkey32bytes!!!"  # AES-256 密钥(32字节)
+  rate_limit:
+    login: 5           # 登录接口限制: 5次/分钟
+    api: 60            # 普通接口限制: 60次/分钟
+  password_min_length: 8
+
+# 文件上传配置
+upload:
+  avatar_path: ./uploads/avatars
+  max_size: 5242880   # 5MB
+  allowed_types:
+    - image/jpeg
+    - image/png
+    - image/gif
+
+# 会员等级配置
+member:
+  levels:
+    - id: 0
+      name: "普通用户"
+      watch_limit: 3       # 每日观影次数
+      ad_free: false
+      quality_4k: false
+    - id: 1
+      name: "白银会员"
+      watch_limit: 10
+      ad_free: false
+      quality_4k: false
+    - id: 2
+      name: "黄金会员"
+      watch_limit: 50
+      ad_free: true
+      quality_4k: false
+    - id: 3
+      name: "钻石会员"
+      watch_limit: -1      # 无限制
+      ad_free: true
+      quality_4k: true
+
+# Emby API配置 (同步创建用户)
+# 支持两种模式: emby (Emby官方) 或 feiniu (飞牛影视)
+emby:
+  enabled: true
+  mode: "emby"                              # emby 或 feiniu
+  base_url: "http://localhost:8096"         # Emby服务器地址
+  api_key: ""                               # Emby API密钥 (在Emby后台 -> 高级 -> API密钥 中生成)
+  admin_user: "admin"                       # 管理员用户名 (飞牛模式使用)
+  admin_pass: "admin123"                    # 管理员密码 (飞牛模式使用)
+
+# 邮件配置 (已废弃 - 请在管理后台"系统设置"中配置)
+# 邮件服务现在从数据库 settings 表读取配置，此处配置不再生效
+# email:
+#   enabled: true
+#   host: "smtp.qq.com"
+#   port: 587
+#   username: "your_email@qq.com"
+#   password: your_password
+#   from: "your_email@qq.com"
+#   from_name: "Emby"

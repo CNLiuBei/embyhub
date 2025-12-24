@@ -29,10 +29,9 @@ ENV TZ=Asia/Shanghai
 
 # 从builder复制二进制文件
 COPY --from=builder /app/server .
-COPY --from=builder /app/config ./config
 
-# 创建日志目录
-RUN mkdir -p logs uploads/avatars
+# 创建必要目录
+RUN mkdir -p logs uploads/avatars config
 
 EXPOSE 8080
 
