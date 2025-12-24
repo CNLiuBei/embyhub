@@ -15,7 +15,7 @@ backend/backend
 backend/server
 backend/emby-proxy
 backend/main
-server
+/server
 
 # Go 安装包
 *.tar.gz
