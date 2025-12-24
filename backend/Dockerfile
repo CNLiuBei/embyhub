@@ -21,9 +21,21 @@ FROM alpine:3.19
 
 WORKDIR /app
 
-# 安装时区数据和 cloudflared
-RUN apk --no-cache add ca-certificates tzdata \
-    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community cloudflared
+# 安装时区数据
+RUN apk --no-cache add ca-certificates tzdata curl
+
+# 下载 cloudflared (支持 amd64 和 arm64)
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        CLOUDFLARED_ARCH="amd64"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        CLOUDFLARED_ARCH="arm64"; \
+    else \
+        CLOUDFLARED_ARCH="amd64"; \
+    fi && \
+    curl -L -o /usr/local/bin/cloudflared \
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CLOUDFLARED_ARCH}" && \
+    chmod +x /usr/local/bin/cloudflared
 
 # 设置时区
 ENV TZ=Asia/Shanghai
