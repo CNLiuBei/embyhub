@@ -12,6 +12,120 @@ import {
 } from '@ant-design/icons'
 import { useSiteSettings } from '../hooks/useSiteSettings'
 
+// 部署方式切换组件
+const DeployTabs = ({ siteSettings }: { siteSettings: any }) => {
+  const [activeTab, setActiveTab] = useState<'docker' | 'binary' | 'source'>('docker')
+
+  const tabs = [
+    { key: 'docker', label: '🐳 Docker', tag: '推荐' },
+    { key: 'binary', label: '📦 二进制', tag: '轻量' },
+    { key: 'source', label: '🔧 源码编译', tag: '开发者' },
+  ]
+
+  const deployContent = {
+    docker: {
+      gradient: 'from-blue-500 to-cyan-500',
+      resultColor: 'text-cyan-400',
+      steps: [
+        { comment: '# 克隆项目', cmd: '$ git clone https://github.com/CNLiuBei/embyhub.git' },
+        { comment: '# 进入目录', cmd: '$ cd embyhub' },
+        { comment: '# 启动服务', cmd: '$ docker compose up -d' },
+        { comment: '# 🎉 完成！访问系统', cmd: '→ http://localhost:54681', isResult: true },
+      ]
+    },
+    binary: {
+      gradient: 'from-green-500 to-emerald-500',
+      resultColor: 'text-emerald-400',
+      steps: [
+        { comment: '# 下载最新版本 (Linux amd64 示例)', cmd: '$ wget https://github.com/CNLiuBei/embyhub/releases/latest/download/server-linux-amd64' },
+        { comment: '# 添加执行权限', cmd: '$ chmod +x server-linux-amd64' },
+        { comment: '# 配置数据库连接 (需要 PostgreSQL + Redis)', cmd: '$ export DB_HOST=localhost DB_USER=embyhub DB_PASSWORD=xxx' },
+        { comment: '# 启动服务', cmd: '$ ./server-linux-amd64' },
+        { comment: '# 🎉 后端启动完成', cmd: '→ http://localhost:8080', isResult: true },
+      ]
+    },
+    source: {
+      gradient: 'from-purple-500 to-pink-500',
+      resultColor: 'text-purple-400',
+      steps: [
+        { comment: '# 克隆项目', cmd: '$ git clone https://github.com/CNLiuBei/embyhub.git && cd embyhub' },
+        { comment: '# 编译后端 (需要 Go 1.24+)', cmd: '$ cd backend && go build -o server ./cmd/server' },
+        { comment: '# 编译前端 (需要 Node.js 18+)', cmd: '$ cd ../frontend && npm install && npm run build' },
+        { comment: '# 🎉 编译完成', cmd: '→ 后端: backend/server | 前端: frontend/dist', isResult: true },
+      ]
+    }
+  }
+
+  const current = deployContent[activeTab]
+
+  return (
+    <>
+      {/* Tab 切换按钮 */}
+      <div className="flex justify-center gap-4 mb-8 flex-wrap">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as any)}
+            className={`px-6 py-3 rounded-xl font-medium transition-all ${
+              activeTab === tab.key
+                ? 'bg-purple-500/20 border border-purple-500/50 text-purple-400'
+                : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            {tab.label}
+            <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
+              activeTab === tab.key ? 'bg-purple-500/20' : 'bg-white/10'
+            }`}>
+              {tab.tag}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* 终端窗口 */}
+      <div className="relative group">
+        <div className={`absolute -inset-1 bg-gradient-to-r ${current.gradient} rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity`} />
+        <div className="relative rounded-3xl overflow-hidden bg-[#1a1a2e] border border-white/10">
+          <div className="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/5">
+            <div className="flex gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500" />
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+            </div>
+            <span className="text-gray-500 text-sm ml-4">Terminal — bash</span>
+          </div>
+          <div className="p-6 font-mono text-sm overflow-x-auto">
+            {current.steps.map((step, i) => (
+              <div key={i}>
+                <div className="text-gray-500 mb-2">{step.comment}</div>
+                <div className={`${step.isResult ? current.resultColor : 'text-green-400'} mb-4 break-all`}>{step.cmd}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 底部按钮 */}
+      <div className="text-center mt-10">
+        <Space size="large">
+          {siteSettings.github_url && (
+            <a href={siteSettings.github_url} target="_blank" rel="noopener noreferrer">
+              <Button size="large" icon={<GithubOutlined />} className="!h-12 !px-8 !rounded-xl !bg-white/5 !border-white/10 !text-white hover:!bg-white/10">
+                GitHub
+              </Button>
+            </a>
+          )}
+          <Link to="/register">
+            <Button type="primary" size="large" icon={<RocketOutlined />} className="!h-12 !px-8 !rounded-xl !bg-gradient-to-r !from-blue-500 !to-purple-500 !border-0">
+              立即体验
+            </Button>
+          </Link>
+        </Space>
+      </div>
+    </>
+  )
+}
+
 // 粒子背景组件
 const ParticleBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -418,58 +532,17 @@ const Home = () => {
         </div>
       </section>
 
-      {/* 快速部署 - 终端效果 */}
+      {/* 快速部署 - 多种方式 */}
       <section id="deploy" className="py-32 px-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <span className="text-purple-400 text-sm font-medium tracking-wider uppercase">Quick Start</span>
             <h2 className="text-4xl font-bold mt-4 mb-4 text-white">快速部署</h2>
-            <p className="text-gray-500">Docker 一键部署，几分钟即可启动</p>
+            <p className="text-gray-500">多种部署方式，灵活选择</p>
           </div>
 
-          {/* 终端窗口 */}
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
-            <div className="relative rounded-3xl overflow-hidden bg-[#1a1a2e] border border-white/10">
-              {/* 终端头部 */}
-              <div className="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/5">
-                <div className="flex gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                </div>
-                <span className="text-gray-500 text-sm ml-4">Terminal — bash</span>
-              </div>
-              {/* 终端内容 */}
-              <div className="p-6 font-mono text-sm">
-                <div className="text-gray-500 mb-2"># 克隆项目</div>
-                <div className="text-green-400 mb-4">$ git clone https://github.com/CNLiuBei/embyhub.git</div>
-                <div className="text-gray-500 mb-2"># 进入目录</div>
-                <div className="text-green-400 mb-4">$ cd embyhub</div>
-                <div className="text-gray-500 mb-2"># 启动服务</div>
-                <div className="text-green-400 mb-4">$ docker compose up -d</div>
-                <div className="text-gray-500 mb-2"># 🎉 完成！访问系统</div>
-                <div className="text-cyan-400">→ http://localhost</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center mt-10">
-            <Space size="large">
-              {siteSettings.github_url && (
-                <a href={siteSettings.github_url} target="_blank" rel="noopener noreferrer">
-                  <Button size="large" icon={<GithubOutlined />} className="!h-12 !px-8 !rounded-xl !bg-white/5 !border-white/10 !text-white hover:!bg-white/10">
-                    GitHub
-                  </Button>
-                </a>
-              )}
-              <Link to="/register">
-                <Button type="primary" size="large" icon={<RocketOutlined />} className="!h-12 !px-8 !rounded-xl !bg-gradient-to-r !from-blue-500 !to-purple-500 !border-0">
-                  立即体验
-                </Button>
-              </Link>
-            </Space>
-          </div>
+          {/* 部署方式切换 */}
+          <DeployTabs siteSettings={siteSettings} />
         </div>
       </section>
 
