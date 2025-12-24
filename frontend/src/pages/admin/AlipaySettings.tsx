@@ -150,11 +150,11 @@ const AlipaySettings = () => {
   })
 
   // 创建隧道（自动处理授权流程）
-  const [pendingTunnelData, setPendingTunnelData] = useState<{ tunnel_name: string; domain: string; subdomain: string; local_port?: number } | null>(null)
+  const [pendingTunnelData, setPendingTunnelData] = useState<{ tunnel_name: string; domain: string; subdomain: string; local_host?: string; local_port?: number } | null>(null)
   const [isWaitingAuth, setIsWaitingAuth] = useState(false)
 
   const createTunnelMutation = useMutation({
-    mutationFn: (data: { tunnel_name: string; domain: string; subdomain: string; local_port?: number }) =>
+    mutationFn: (data: { tunnel_name: string; domain: string; subdomain: string; local_host?: string; local_port?: number }) =>
       tunnelApi.createTunnel(data),
     onSuccess: (response) => {
       const data = response.data.data
@@ -720,6 +720,15 @@ const AlipaySettings = () => {
                   <Badge status="default" text="已停止" />
                 )}
               </Descriptions.Item>
+              <Descriptions.Item label="连通性">
+                {!tunnelStatus?.running ? (
+                  <Badge status="default" text="未运行" />
+                ) : tunnelStatus?.connected ? (
+                  <Badge status="success" text="已连通" />
+                ) : (
+                  <Badge status="error" text="无法连通" />
+                )}
+              </Descriptions.Item>
             </Descriptions>
 
             {/* 操作按钮 */}
@@ -757,7 +766,7 @@ const AlipaySettings = () => {
             <Card title="隧道信息" size="small" className="mb-4">
               <Descriptions column={2} size="small">
                 <Descriptions.Item label="隧道名称">{tunnelStatus.tunnel_name}</Descriptions.Item>
-                <Descriptions.Item label="本地端口">{tunnelStatus.local_port}</Descriptions.Item>
+                <Descriptions.Item label="本地地址">{tunnelStatus.local_host || 'localhost'}:{tunnelStatus.local_port}</Descriptions.Item>
                 <Descriptions.Item label="公网域名" span={2}>
                   <Space>
                     <a href={`https://${tunnelStatus.full_domain}`} target="_blank" rel="noopener noreferrer">
@@ -985,7 +994,7 @@ const AlipaySettings = () => {
           form={tunnelForm}
           layout="vertical"
           onFinish={(values) => createTunnelMutation.mutate(values)}
-          initialValues={{ local_port: 54680 }}
+          initialValues={{ local_host: 'localhost', local_port: 54680 }}
         >
           <Form.Item
             name="tunnel_name"
@@ -1012,6 +1021,14 @@ const AlipaySettings = () => {
             extra="最终域名将是: 子域名.主域名"
           >
             <Input placeholder="如：pay" addonAfter=".您的域名" disabled={isWaitingAuth} />
+          </Form.Item>
+
+          <Form.Item
+            name="local_host"
+            label="本地IP/主机"
+            extra="后端服务运行的IP地址，默认 localhost"
+          >
+            <Input placeholder="localhost" disabled={isWaitingAuth} />
           </Form.Item>
 
           <Form.Item

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +26,7 @@ type CloudflareTunnelConfig struct {
 	Domain        string    `json:"domain" gorm:"size:200"`              // 主域名 (如 liubei.org)
 	Subdomain     string    `json:"subdomain" gorm:"size:100"`           // 子域名前缀 (如 pay)
 	FullDomain    string    `json:"full_domain" gorm:"size:300"`         // 完整域名 (如 pay.liubei.org)
+	LocalHost     string    `json:"local_host" gorm:"size:100;default:localhost"` // 本地主机/IP
 	LocalPort     int       `json:"local_port" gorm:"default:54680"`     // 本地端口
 	Status        string    `json:"status" gorm:"size:20;default:stopped"` // running, stopped, error
 	ConfigPath    string    `json:"config_path" gorm:"size:500"`         // 配置文件路径
@@ -66,6 +68,7 @@ func (s *CloudflareTunnelService) GetConfig() (*CloudflareTunnelConfig, error) {
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return &CloudflareTunnelConfig{
+				LocalHost: "localhost",
 				LocalPort: 54680,
 				Status:    "stopped",
 			}, nil
@@ -248,7 +251,8 @@ type CreateTunnelRequest struct {
 	TunnelName string `json:"tunnel_name" binding:"required"`
 	Domain     string `json:"domain" binding:"required"`
 	Subdomain  string `json:"subdomain" binding:"required"`
-	LocalPort  int    `json:"local_port"`
+	LocalHost  string `json:"local_host"` // 本地主机/IP，默认 localhost
+	LocalPort  int    `json:"local_port"` // 本地端口，默认 54680
 }
 
 // CreateTunnel 创建隧道（如果未授权返回授权URL）
@@ -333,7 +337,10 @@ func (s *CloudflareTunnelService) CreateTunnel(req *CreateTunnelRequest) (*Creat
 
 // doCreateTunnel 实际创建隧道的逻辑
 func (s *CloudflareTunnelService) doCreateTunnel(req *CreateTunnelRequest, cfPath string) (*CreateTunnelResult, error) {
-	// 设置默认端口
+	// 设置默认值
+	if req.LocalHost == "" {
+		req.LocalHost = "localhost"
+	}
 	if req.LocalPort == 0 {
 		req.LocalPort = 54680
 	}
@@ -372,15 +379,15 @@ func (s *CloudflareTunnelService) doCreateTunnel(req *CreateTunnelRequest, cfPat
 	configPath := filepath.Join(configDir, fmt.Sprintf("%s-config.yml", req.TunnelName))
 	credPath := filepath.Join(configDir, fmt.Sprintf("%s.json", tunnelID))
 
-	// 4. 创建配置文件
+	// 4. 创建配置文件（使用配置的 host 和 port）
 	configContent := fmt.Sprintf(`tunnel: %s
 credentials-file: %s
 
 ingress:
   - hostname: %s
-    service: http://localhost:%d
+    service: http://%s:%d
   - service: http_status:404
-`, tunnelID, credPath, fullDomain, req.LocalPort)
+`, tunnelID, credPath, fullDomain, req.LocalHost, req.LocalPort)
 
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return nil, fmt.Errorf("创建配置文件失败: %w", err)
@@ -402,6 +409,7 @@ ingress:
 		Domain:     req.Domain,
 		Subdomain:  req.Subdomain,
 		FullDomain: fullDomain,
+		LocalHost:  req.LocalHost,
 		LocalPort:  req.LocalPort,
 		Status:     "stopped",
 		ConfigPath: configPath,
@@ -614,8 +622,10 @@ type TunnelStatus struct {
 	LoggedIn     bool   `json:"logged_in"`
 	Configured   bool   `json:"configured"`
 	Running      bool   `json:"running"`
+	Connected    bool   `json:"connected"`    // 隧道是否能联通
 	TunnelName   string `json:"tunnel_name"`
 	FullDomain   string `json:"full_domain"`
+	LocalHost    string `json:"local_host"`  // 本地主机/IP
 	LocalPort    int    `json:"local_port"`
 	ErrorMsg     string `json:"error_msg"`
 	NotifyURL    string `json:"notify_url"` // 支付宝回调地址
@@ -642,6 +652,7 @@ func (s *CloudflareTunnelService) GetStatus() (*TunnelStatus, error) {
 	status.Running = config.Status == "running"
 	status.TunnelName = config.TunnelName
 	status.FullDomain = config.FullDomain
+	status.LocalHost = config.LocalHost
 	status.LocalPort = config.LocalPort
 	status.ErrorMsg = config.ErrorMsg
 
@@ -650,7 +661,36 @@ func (s *CloudflareTunnelService) GetStatus() (*TunnelStatus, error) {
 		status.NotifyURL = fmt.Sprintf("https://%s/api/v1/payment/alipay/notify", config.FullDomain)
 	}
 
+	// 检测隧道连通性（仅在运行中时检测）
+	if status.Running && config.FullDomain != "" {
+		status.Connected = s.checkTunnelConnectivity(config.FullDomain)
+	}
+
 	return status, nil
+}
+
+// checkTunnelConnectivity 检测隧道是否能联通
+func (s *CloudflareTunnelService) checkTunnelConnectivity(domain string) bool {
+	// 使用 HTTP 请求检测隧道是否能联通
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+	
+	// 尝试访问健康检查端点或根路径
+	url := fmt.Sprintf("https://%s/api/v1/health", domain)
+	resp, err := client.Get(url)
+	if err != nil {
+		// 如果健康检查失败，尝试访问根路径
+		url = fmt.Sprintf("https://%s/", domain)
+		resp, err = client.Get(url)
+		if err != nil {
+			return false
+		}
+	}
+	defer resp.Body.Close()
+	
+	// 只要能收到响应就认为连通（不管状态码）
+	return true
 }
 
 // RestartTunnel 重启隧道

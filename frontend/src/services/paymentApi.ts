@@ -157,8 +157,10 @@ export interface TunnelStatus {
   logged_in: boolean
   configured: boolean
   running: boolean
+  connected: boolean
   tunnel_name: string
   full_domain: string
+  local_host: string
   local_port: number
   error_msg: string
   notify_url: string
@@ -172,6 +174,7 @@ export interface TunnelConfig {
   domain: string
   subdomain: string
   full_domain: string
+  local_host: string
   local_port: number
   status: string
   config_path: string
@@ -200,7 +203,7 @@ export const tunnelApi = {
     api.post<{ code: number; data: { logged_in: boolean; auth_url?: string; message?: string } }>('/admin/tunnel/login', {}, { timeout: 60000 }),
 
   // 创建隧道（可能返回授权URL或配置）
-  createTunnel: (data: { tunnel_name: string; domain: string; subdomain: string; local_port?: number }) =>
+  createTunnel: (data: { tunnel_name: string; domain: string; subdomain: string; local_host?: string; local_port?: number }) =>
     api.post<{ code: number; data: { need_auth: boolean; auth_url?: string; config?: TunnelConfig; message?: string } }>('/admin/tunnel/create', data, { timeout: 60000 }),
 
   // 启动隧道
