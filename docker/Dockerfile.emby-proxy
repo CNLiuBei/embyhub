@@ -14,7 +14,10 @@ ENV TZ=Asia/Shanghai
 WORKDIR /app
 COPY --from=builder /build/emby-proxy .
 
-RUN mkdir -p logs config
+# 复制默认配置文件（Docker环境专用）
+COPY docker/config/config.yaml ./config/config.yaml
+
+RUN mkdir -p logs
 
 EXPOSE 54682
 CMD ["./emby-proxy"]

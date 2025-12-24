@@ -46,6 +46,9 @@ COPY --from=builder /app/server .
 # 创建必要目录
 RUN mkdir -p logs uploads/avatars config
 
+# 复制默认配置文件（Docker环境专用）
+COPY config/config.docker.yaml ./config/config.yaml
+
 EXPOSE 8080
 
 CMD ["./server"]

@@ -62,13 +62,10 @@ cat > "${BUILD_DIR}/feiniu-docker/README.md" << 'EOF'
 ## 快速开始
 
 ```bash
-# 1. 修改配置文件
-nano config/config.yaml
-
-# 2. 启动服务
+# 直接启动服务（配置已内置，开箱即用）
 docker-compose up -d
 
-# 3. 查看日志
+# 查看日志
 docker-compose logs -f
 ```
 
@@ -81,10 +78,25 @@ docker-compose logs -f
 - 用户名: admin
 - 密码: admin123
 
-## 配置说明
-编辑 `config/config.yaml`，修改以下内容：
-- `emby.base_url`: 你的Emby服务器地址
-- `emby.api_key`: Emby API密钥
+## 自定义配置（可选）
+如需修改配置，可以挂载自定义配置文件：
+
+1. 复制配置模板：
+```bash
+cp config/config.yaml ./my-config.yaml
+nano my-config.yaml
+```
+
+2. 修改 docker-compose.yml，取消配置挂载的注释：
+```yaml
+volumes:
+  - ./my-config.yaml:/app/config/config.yaml
+```
+
+3. 重启服务：
+```bash
+docker-compose restart
+```
 
 ## 管理命令
 ```bash
@@ -111,10 +123,11 @@ echo "部署步骤:"
 echo "  1. 上传到服务器"
 echo "  2. tar -xzvf feiniu-docker-*.tar.gz"
 echo "  3. cd feiniu-docker"
-echo "  4. nano config/config.yaml  # 修改Emby配置"
-echo "  5. docker-compose up -d"
+echo "  4. docker-compose up -d  # 开箱即用，无需配置"
 echo ""
 echo "端口说明:"
 echo "  - 54681: 前端"
 echo "  - 54680: 后端API"
 echo "  - 54682: Emby代理"
+echo ""
+echo "如需自定义配置，请参考 README.md"

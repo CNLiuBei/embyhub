@@ -13,7 +13,9 @@ ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 COPY --from=builder /build/server .
-COPY backend/config/config.yaml ./config/
+
+# 复制默认配置文件（Docker环境专用）
+COPY docker/config/config.yaml ./config/config.yaml
 
 RUN mkdir -p logs uploads/avatars uploads/logo
 

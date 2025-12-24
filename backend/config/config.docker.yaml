@@ -1,6 +1,6 @@
 # 飞牛用户系统配置文件 (Docker版)
 # 此配置已内置到镜像中，开箱即用
-# 如需自定义，可挂载覆盖: -v ./config.yaml:/app/config/config.yaml
+# 敏感配置通过环境变量覆盖
 
 server:
   port: 8080
@@ -31,7 +31,7 @@ redis:
 
 # JWT 配置
 jwt:
-  secret: "emby-user-system-jwt-secret-key-2024-change-me"
+  secret: "emby-user-system-jwt-secret-key-2024"
   access_expire: 7200
   refresh_expire: 604800
   issuer: "emby-user-system"
@@ -86,11 +86,11 @@ member:
       ad_free: true
       quality_4k: true
 
-# Emby API配置 - 请修改为你的Emby服务器地址
+# Emby API配置 - 通过管理后台配置
 emby:
   enabled: true
   mode: "emby"
-  base_url: "http://YOUR_EMBY_IP:8096"
-  api_key: "YOUR_EMBY_API_KEY"
+  base_url: "http://localhost:8096"
+  api_key: ""
   admin_user: "admin"
   admin_pass: "admin123"

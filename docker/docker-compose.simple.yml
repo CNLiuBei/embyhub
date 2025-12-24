@@ -2,6 +2,7 @@ version: '3.8'
 
 # EmbyHub Docker 部署配置
 # 使用方法: docker compose up -d
+# 配置文件已内置到镜像，开箱即用
 
 services:
   # PostgreSQL 数据库
@@ -10,15 +11,15 @@ services:
     container_name: embyhub-postgres
     restart: always
     environment:
-      POSTGRES_USER: fnuser
-      POSTGRES_PASSWORD: fnuser123
-      POSTGRES_DB: feiniu_user
+      POSTGRES_USER: embyhub
+      POSTGRES_PASSWORD: embyhub123
+      POSTGRES_DB: embyhub
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - embyhub-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fnuser -d feiniu_user"]
+      test: ["CMD-SHELL", "pg_isready -U embyhub -d embyhub"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,7 +31,7 @@ services:
     restart: always
     command: redis-server --appendonly yes
     volumes:
-      - ./data/redis:/data
+      - redis_data:/data
     networks:
       - embyhub-network
 
@@ -45,9 +46,10 @@ services:
       redis:
         condition: service_started
     volumes:
-      - ./config:/app/config
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
+      # 配置文件已内置到镜像，如需自定义可取消下行注释
+      # - ./config/config.yaml:/app/config/config.yaml
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
       - ./bin:/app/bin
     ports:
       - "54680:8080"
@@ -65,6 +67,12 @@ services:
       - "54681:80"
     networks:
       - embyhub-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_logs:
+  backend_uploads:
 
 networks:
   embyhub-network:
