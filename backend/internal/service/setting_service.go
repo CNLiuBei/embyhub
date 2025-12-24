@@ -4,6 +4,8 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
 
 	"feiniu-user-system/internal/models"
 
@@ -148,11 +150,38 @@ func (s *SettingService) SaveDomainSettings(settings *DomainSettings, updatedBy 
 
 // ============= 注册设置 =============
 
+// FlexInt 灵活的整数类型，可以从字符串或数字解析
+type FlexInt int
+
+func (fi *FlexInt) UnmarshalJSON(data []byte) error {
+	// 尝试解析为数字
+	var i int
+	if err := json.Unmarshal(data, &i); err == nil {
+		*fi = FlexInt(i)
+		return nil
+	}
+	// 尝试解析为字符串
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		if s == "" {
+			*fi = 0
+			return nil
+		}
+		parsed, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("cannot parse %q as int", s)
+		}
+		*fi = FlexInt(parsed)
+		return nil
+	}
+	return fmt.Errorf("cannot unmarshal %s into FlexInt", data)
+}
+
 // RegisterSettings 注册设置结构
 type RegisterSettings struct {
-	Enabled          bool `json:"enabled"`             // 是否允许注册
-	GiftMemberDays   int  `json:"gift_member_days"`    // 注册赠送会员天数（0表示不赠送）
-	AutoDisableOnExp bool `json:"auto_disable_on_exp"` // 会员到期后自动禁用账户
+	Enabled          bool    `json:"enabled"`             // 是否允许注册
+	GiftMemberDays   FlexInt `json:"gift_member_days"`    // 注册赠送会员天数（0表示不赠送）
+	AutoDisableOnExp bool    `json:"auto_disable_on_exp"` // 会员到期后自动禁用账户
 }
 
 // GetRegisterSettings 获取注册设置

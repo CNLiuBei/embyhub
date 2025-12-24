@@ -185,7 +185,7 @@ const Settings = () => {
       setRegisterSaving(true)
       const payload = {
         enabled: values.register_enabled,
-        gift_member_days: values.gift_member_days || 0,
+        gift_member_days: Number(values.gift_member_days) || 0,
         auto_disable_on_exp: values.auto_disable_on_exp
       }
       await adminApi.saveRegisterSettings(payload)
