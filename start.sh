@@ -66,8 +66,8 @@ start_backend() {
     log_info "等待后端启动..."
     sleep 5
     
-    if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        log_success "后端服务已启动 (端口 8080)"
+    if lsof -Pi :54680 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        log_success "后端服务已启动 (端口 54680)"
     else
         log_error "后端启动失败，请查看日志: $PROJECT_DIR/backend.log"
         exit 1
@@ -83,8 +83,8 @@ start_frontend() {
     
     sleep 3
     
-    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        log_success "前端服务已启动 (端口 3000)"
+    if lsof -Pi :54681 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        log_success "前端服务已启动 (端口 54681)"
     else
         log_error "前端启动失败，请查看日志: $PROJECT_DIR/frontend.log"
         exit 1
@@ -97,11 +97,11 @@ stop_services() {
     
     # 停止后端
     pkill -f "go run cmd/server/main.go" 2>/dev/null || true
-    fuser -k 8080/tcp 2>/dev/null || true
+    fuser -k 54680/tcp 2>/dev/null || true
     
     # 停止前端
     pkill -f "vite" 2>/dev/null || true
-    fuser -k 3000/tcp 2>/dev/null || true
+    fuser -k 54681/tcp 2>/dev/null || true
     
     log_success "服务已停止"
 }
@@ -113,14 +113,14 @@ show_status() {
     echo "       EmbyHub用户管理系统"
     echo "======================================"
     
-    if lsof -Pi :8080 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "后端服务: ${GREEN}运行中${NC} (http://localhost:8080)"
+    if lsof -Pi :54680 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "后端服务: ${GREEN}运行中${NC} (http://localhost:54680)"
     else
         echo -e "后端服务: ${RED}未运行${NC}"
     fi
     
-    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "前端服务: ${GREEN}运行中${NC} (http://localhost:3000)"
+    if lsof -Pi :54681 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "前端服务: ${GREEN}运行中${NC} (http://localhost:54681)"
     else
         echo -e "前端服务: ${RED}未运行${NC}"
     fi
@@ -143,8 +143,8 @@ case "${1:-start}" in
         start_frontend
         show_status
         echo ""
-        log_info "访问地址: http://localhost:3000"
-        log_info "API文档: http://localhost:8080/swagger/index.html"
+        log_info "访问地址: http://localhost:54681"
+        log_info "API文档: http://localhost:54680/swagger/index.html"
         ;;
     stop)
         stop_services

@@ -60,7 +60,7 @@ services:
       - backend_uploads:/app/uploads
       - cloudflared_data:/root/.cloudflared
     ports:
-      - "54680:8080"
+      - "54680:54680"
     networks:
       - embyhub-network
 
@@ -97,7 +97,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "54681:80"
+      - "54681:54681"
     networks:
       - embyhub-network
 

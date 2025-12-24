@@ -345,6 +345,10 @@ func (s *CloudflareTunnelService) doCreateTunnel(req *CreateTunnelRequest, cfPat
 		req.LocalPort = 54680
 	}
 
+	// Docker 环境下自动转换主机地址
+	// 如果是宿主机 IP 或 localhost，在容器内需要使用特殊地址
+	serviceHost := s.resolveServiceHost(req.LocalHost)
+
 	// 构建完整域名
 	fullDomain := fmt.Sprintf("%s.%s", req.Subdomain, req.Domain)
 
@@ -379,7 +383,7 @@ func (s *CloudflareTunnelService) doCreateTunnel(req *CreateTunnelRequest, cfPat
 	configPath := filepath.Join(configDir, fmt.Sprintf("%s-config.yml", req.TunnelName))
 	credPath := filepath.Join(configDir, fmt.Sprintf("%s.json", tunnelID))
 
-	// 4. 创建配置文件（使用配置的 host 和 port）
+	// 4. 创建配置文件（使用解析后的 host 和 port）
 	configContent := fmt.Sprintf(`tunnel: %s
 credentials-file: %s
 
@@ -387,7 +391,7 @@ ingress:
   - hostname: %s
     service: http://%s:%d
   - service: http_status:404
-`, tunnelID, credPath, fullDomain, req.LocalHost, req.LocalPort)
+`, tunnelID, credPath, fullDomain, serviceHost, req.LocalPort)
 
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return nil, fmt.Errorf("创建配置文件失败: %w", err)
@@ -613,6 +617,84 @@ func (s *CloudflareTunnelService) updateStatus(id uint, status, errorMsg string)
 		"status":    status,
 		"error_msg": errorMsg,
 	})
+}
+
+// resolveServiceHost 解析服务主机地址（处理 Docker 网络）
+func (s *CloudflareTunnelService) resolveServiceHost(host string) string {
+	// 检测是否在 Docker 容器内运行
+	if !s.isRunningInDocker() {
+		return host
+	}
+
+	// 在 Docker 容器内，需要特殊处理
+	switch {
+	case host == "localhost" || host == "127.0.0.1":
+		// localhost 在容器内指向容器自身，通常需要改为 host.docker.internal
+		// 但如果后端服务也在同一容器内，则保持 localhost
+		return "localhost"
+	case s.isPrivateIP(host):
+		// 私有 IP（如 10.x.x.x, 192.168.x.x）通常是宿主机 IP
+		// 在 Docker 容器内应该使用 host.docker.internal（macOS/Windows）
+		// 或 172.17.0.1（Linux Docker 默认网关）
+		// 优先尝试 host.docker.internal
+		if s.canResolveHost("host.docker.internal") {
+			return "host.docker.internal"
+		}
+		// Linux 环境下使用 Docker 默认网关
+		return "172.17.0.1"
+	default:
+		return host
+	}
+}
+
+// isRunningInDocker 检测是否在 Docker 容器内运行
+func (s *CloudflareTunnelService) isRunningInDocker() bool {
+	// 检查 /.dockerenv 文件是否存在
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	// 检查 /proc/1/cgroup 是否包含 docker
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		if strings.Contains(string(data), "docker") {
+			return true
+		}
+	}
+	return false
+}
+
+// isPrivateIP 检查是否是私有 IP 地址
+func (s *CloudflareTunnelService) isPrivateIP(ip string) bool {
+	// 10.0.0.0/8
+	if strings.HasPrefix(ip, "10.") {
+		return true
+	}
+	// 172.16.0.0/12
+	if strings.HasPrefix(ip, "172.") {
+		parts := strings.Split(ip, ".")
+		if len(parts) >= 2 {
+			var second int
+			fmt.Sscanf(parts[1], "%d", &second)
+			if second >= 16 && second <= 31 {
+				return true
+			}
+		}
+	}
+	// 192.168.0.0/16
+	if strings.HasPrefix(ip, "192.168.") {
+		return true
+	}
+	return false
+}
+
+// canResolveHost 检查主机名是否可解析
+func (s *CloudflareTunnelService) canResolveHost(host string) bool {
+	cmd := exec.Command("getent", "hosts", host)
+	if err := cmd.Run(); err == nil {
+		return true
+	}
+	// 备用方法：尝试 ping
+	cmd = exec.Command("ping", "-c", "1", "-W", "1", host)
+	return cmd.Run() == nil
 }
 
 // GetStatus 获取隧道状态

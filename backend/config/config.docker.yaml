@@ -3,7 +3,7 @@
 # 敏感配置通过环境变量覆盖
 
 server:
-  port: 8080
+  port: 54680
   mode: release
   read_timeout: 10
   write_timeout: 10
