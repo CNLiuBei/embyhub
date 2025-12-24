@@ -52,13 +52,13 @@ func (s *SchedulerService) Start() {
 	log.Println("✅ 所有定时任务已启动")
 }
 
-// runPeriodically 周期性执行任务
+// runPeriodically 周期性执行任务（静默模式，不打印每次执行日志）
 func (s *SchedulerService) runPeriodically(name string, interval time.Duration, task func()) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		log.Printf("⏰ 执行定时任务: %s", name)
+		// 静默执行，由具体任务决定是否打印日志
 		task()
 	}
 }
@@ -343,8 +343,11 @@ func (s *SchedulerService) ExecutePointsGiftRules() {
 	}
 
 	if len(rules) == 0 {
-		return // 没有待执行的规则
+		// 没有待执行的规则，静默返回，不打印日志
+		return
 	}
+
+	log.Printf("📋 发现 %d 个待执行的积分赠送规则", len(rules))
 
 	for _, rule := range rules {
 		log.Printf("⏰ 执行积分自动赠送规则: %s (ID: %d)", rule.Name, rule.ID)

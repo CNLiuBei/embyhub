@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Button, Space, Tag } from 'antd'
+import { Button, Space } from 'antd'
 import { 
   UserOutlined, CrownOutlined, SafetyOutlined, CloudServerOutlined,
   ThunderboltOutlined, ApiOutlined, GithubOutlined, SendOutlined,
-  QqOutlined, LoginOutlined, UserAddOutlined, CheckCircleOutlined,
+  QqOutlined, UserAddOutlined, CheckCircleOutlined,
   RocketOutlined, SettingOutlined, TeamOutlined, GiftOutlined,
   BellOutlined, PlayCircleOutlined, DatabaseOutlined, GlobalOutlined,
   MobileOutlined, LockOutlined, SyncOutlined, StarOutlined,

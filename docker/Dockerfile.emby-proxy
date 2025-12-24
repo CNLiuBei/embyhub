@@ -13,7 +13,7 @@ ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 COPY --from=builder /build/emby-proxy .
-COPY backend/config/config.yaml ./config/
+COPY backend/config/config.example.yaml ./config/config.yaml
 
 RUN mkdir -p logs
 
