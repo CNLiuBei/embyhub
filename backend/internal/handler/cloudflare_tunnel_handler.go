@@ -44,10 +44,18 @@ func (h *CloudflareTunnelHandler) GetConfig(c *gin.Context) {
 
 // DownloadCloudflared 下载 cloudflared 二进制文件
 func (h *CloudflareTunnelHandler) DownloadCloudflared(c *gin.Context) {
+	// 获取下载信息
+	downloadInfo := h.tunnelService.GetDownloadInfo()
+
 	// 检查是否已下载
 	if h.tunnelService.IsCloudflaredDownloaded() {
+		version, _ := h.tunnelService.GetCloudflaredVersion()
 		response.SuccessWithMessage(c, "cloudflared 已存在", gin.H{
-			"path": h.tunnelService.GetCloudflaredBinPath(),
+			"path":     h.tunnelService.GetCloudflaredBinPath(),
+			"version":  version,
+			"os":       downloadInfo.OS,
+			"arch":     downloadInfo.Arch,
+			"fileName": downloadInfo.FileName,
 		})
 		return
 	}
@@ -59,8 +67,13 @@ func (h *CloudflareTunnelHandler) DownloadCloudflared(c *gin.Context) {
 		return
 	}
 
+	version, _ := h.tunnelService.GetCloudflaredVersion()
 	response.SuccessWithMessage(c, "cloudflared 下载成功", gin.H{
-		"path": h.tunnelService.GetCloudflaredBinPath(),
+		"path":     h.tunnelService.GetCloudflaredBinPath(),
+		"version":  version,
+		"os":       downloadInfo.OS,
+		"arch":     downloadInfo.Arch,
+		"fileName": downloadInfo.FileName,
 	})
 }
 

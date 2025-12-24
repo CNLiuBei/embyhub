@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, Form, Input, Switch, Button, App, Space, Table, Tag, Tooltip, Typography, Modal, InputNumber, Popconfirm, Tabs, Alert, Descriptions, Badge } from 'antd'
 import { AlipayCircleOutlined, SaveOutlined, ApiOutlined, ReloadOutlined, EyeOutlined, EyeInvisibleOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CrownOutlined, CloudOutlined, PlayCircleOutlined, PauseCircleOutlined, CopyOutlined, DownloadOutlined } from '@ant-design/icons'
@@ -54,8 +54,21 @@ const AlipaySettings = () => {
       const response = await tunnelApi.getStatus()
       return response.data.data as TunnelStatus
     },
-    refetchInterval: 5000, // 每5秒刷新一次状态
+    refetchInterval: 3000, // 每3秒刷新一次状态
   })
+
+  // 记录之前的配置状态
+  const prevConfiguredRef = useRef<boolean | undefined>(undefined)
+  
+  // 监听隧道状态变化，如果配置成功则关闭弹窗
+  useEffect(() => {
+    if (tunnelModalOpen && tunnelStatus?.configured && prevConfiguredRef.current === false) {
+      setTunnelModalOpen(false)
+      tunnelForm.resetFields()
+      message.success('隧道创建成功')
+    }
+    prevConfiguredRef.current = tunnelStatus?.configured
+  }, [tunnelStatus?.configured, tunnelModalOpen, tunnelForm, message])
 
   // 保存配置
   const saveMutation = useMutation({
@@ -147,7 +160,13 @@ const AlipaySettings = () => {
       tunnelForm.resetFields()
     },
     onError: (err: Error) => {
+      // 即使报错也刷新状态，因为可能是超时但实际已成功
+      queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
       message.error(err.message || '创建隧道失败')
+    },
+    onSettled: () => {
+      // 无论成功失败都刷新状态
+      queryClient.invalidateQueries({ queryKey: ['tunnelStatus'] })
     },
   })
 

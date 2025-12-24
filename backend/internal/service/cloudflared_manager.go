@@ -14,12 +14,19 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
-const (
-	// cloudflared 下载地址模板
-	cloudflaredDownloadURL = "https://github.com/cloudflare/cloudflared/releases/latest/download/%s"
-)
+// 下载地址列表（按优先级排序，国内镜像优先）
+var cloudflaredDownloadURLs = []string{
+	// 国内镜像 - 优先使用
+	"https://mirror.ghproxy.com/https://github.com/cloudflare/cloudflared/releases/latest/download/%s",
+	"https://gh.ddlc.top/https://github.com/cloudflare/cloudflared/releases/latest/download/%s",
+	"https://ghps.cc/https://github.com/cloudflare/cloudflared/releases/latest/download/%s",
+	"https://gh-proxy.com/https://github.com/cloudflare/cloudflared/releases/latest/download/%s",
+	// GitHub 官方 - 备用
+	"https://github.com/cloudflare/cloudflared/releases/latest/download/%s",
+}
 
 // CloudflaredManager 管理 cloudflared 二进制文件
 type CloudflaredManager struct {
@@ -78,38 +85,76 @@ func (m *CloudflaredManager) GetVersion() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// getDownloadFileName 根据操作系统和架构获取下载文件名
-func (m *CloudflaredManager) getDownloadFileName() string {
-	os := runtime.GOOS
-	arch := runtime.GOARCH
-	
-	switch os {
-	case "darwin":
-		if arch == "arm64" {
-			return "cloudflared-darwin-arm64.tgz"
-		}
-		return "cloudflared-darwin-amd64.tgz"
-	case "linux":
-		switch arch {
-		case "arm64":
-			return "cloudflared-linux-arm64"
-		case "arm":
-			return "cloudflared-linux-arm"
-		case "386":
-			return "cloudflared-linux-386"
-		default:
-			return "cloudflared-linux-amd64"
-		}
-	case "windows":
-		if arch == "386" {
-			return "cloudflared-windows-386.exe"
-		}
-		return "cloudflared-windows-amd64.exe"
-	default:
-		return "cloudflared-linux-amd64"
-	}
+// DownloadInfo 下载信息
+type DownloadInfo struct {
+	FileName string // 文件名
+	OS       string // 操作系统
+	Arch     string // 架构
+	IsTgz    bool   // 是否为 tgz 压缩包
+	IsZip    bool   // 是否为 zip 压缩包
 }
 
+// GetDownloadInfo 获取当前系统的下载信息
+func (m *CloudflaredManager) GetDownloadInfo() *DownloadInfo {
+	osName := runtime.GOOS
+	arch := runtime.GOARCH
+
+	info := &DownloadInfo{
+		OS:   osName,
+		Arch: arch,
+	}
+
+	switch osName {
+	case "darwin":
+		// macOS - 使用 tgz 压缩包
+		if arch == "arm64" {
+			info.FileName = "cloudflared-darwin-arm64.tgz"
+		} else {
+			info.FileName = "cloudflared-darwin-amd64.tgz"
+		}
+		info.IsTgz = true
+
+	case "linux":
+		// Linux - 直接下载二进制文件
+		switch arch {
+		case "arm64", "aarch64":
+			info.FileName = "cloudflared-linux-arm64"
+		case "arm":
+			info.FileName = "cloudflared-linux-arm"
+		case "386":
+			info.FileName = "cloudflared-linux-386"
+		default:
+			info.FileName = "cloudflared-linux-amd64"
+		}
+
+	case "windows":
+		// Windows - 直接下载 exe 文件
+		if arch == "386" {
+			info.FileName = "cloudflared-windows-386.exe"
+		} else {
+			info.FileName = "cloudflared-windows-amd64.exe"
+		}
+
+	case "freebsd":
+		// FreeBSD
+		info.FileName = "cloudflared-freebsd-amd64"
+
+	default:
+		// 默认使用 Linux amd64
+		info.FileName = "cloudflared-linux-amd64"
+	}
+
+	return info
+}
+
+// getDownloadURLs 获取下载地址列表（国内镜像优先）
+func (m *CloudflaredManager) getDownloadURLs(fileName string) []string {
+	urls := make([]string, len(cloudflaredDownloadURLs))
+	for i, tpl := range cloudflaredDownloadURLs {
+		urls[i] = fmt.Sprintf(tpl, fileName)
+	}
+	return urls
+}
 
 // Download 下载 cloudflared
 func (m *CloudflaredManager) Download(progressCallback func(downloaded, total int64)) error {
@@ -117,30 +162,70 @@ func (m *CloudflaredManager) Download(progressCallback func(downloaded, total in
 	if err := os.MkdirAll(m.binDir, 0755); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}
-	
-	fileName := m.getDownloadFileName()
-	downloadURL := fmt.Sprintf(cloudflaredDownloadURL, fileName)
-	
-	// 下载文件
-	resp, err := http.Get(downloadURL)
+
+	info := m.GetDownloadInfo()
+	urls := m.getDownloadURLs(info.FileName)
+
+	// 创建带超时的 HTTP 客户端
+	client := &http.Client{
+		Timeout: 5 * time.Minute, // 5分钟超时
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// 允许重定向，最多10次
+			if len(via) >= 10 {
+				return fmt.Errorf("重定向次数过多")
+			}
+			return nil
+		},
+	}
+
+	var lastErr error
+	var triedURLs []string
+
+	for i, downloadURL := range urls {
+		if i > 0 {
+			// 非第一个地址，等待一下再重试
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		triedURLs = append(triedURLs, downloadURL)
+		err := m.downloadFromURL(client, downloadURL, info, progressCallback)
+		if err == nil {
+			return nil // 下载成功
+		}
+		lastErr = err
+		// 继续尝试下一个地址
+	}
+
+	return fmt.Errorf("所有下载地址均失败 (尝试了 %d 个地址)\n系统: %s, 架构: %s, 文件: %s\n最后错误: %v",
+		len(triedURLs), info.OS, info.Arch, info.FileName, lastErr)
+}
+
+// downloadFromURL 从指定 URL 下载
+func (m *CloudflaredManager) downloadFromURL(client *http.Client, downloadURL string, info *DownloadInfo, progressCallback func(downloaded, total int64)) error {
+	req, err := http.NewRequest("GET", downloadURL, nil)
 	if err != nil {
-		return fmt.Errorf("下载失败: %w", err)
+		return fmt.Errorf("创建请求失败: %w", err)
+	}
+
+	// 设置 User-Agent，避免被拒绝
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; cloudflared-downloader/1.0)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("请求失败: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("下载失败: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
-	
+
 	// 根据文件类型处理
-	if strings.HasSuffix(fileName, ".tgz") {
-		// macOS: 解压 tgz 文件
+	if info.IsTgz {
 		return m.extractTgz(resp.Body, progressCallback, resp.ContentLength)
-	} else if strings.HasSuffix(fileName, ".zip") {
-		// 解压 zip 文件
+	} else if info.IsZip {
 		return m.extractZip(resp.Body, progressCallback, resp.ContentLength)
 	} else {
-		// Linux/Windows: 直接保存二进制文件
 		return m.saveBinary(resp.Body, progressCallback, resp.ContentLength)
 	}
 }

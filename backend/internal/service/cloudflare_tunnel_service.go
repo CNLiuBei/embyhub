@@ -124,6 +124,16 @@ func (s *CloudflareTunnelService) GetCloudflaredBinPath() string {
 	return s.manager.GetBinPath()
 }
 
+// GetDownloadInfo 获取下载信息
+func (s *CloudflareTunnelService) GetDownloadInfo() *DownloadInfo {
+	return s.manager.GetDownloadInfo()
+}
+
+// GetCloudflaredVersion 获取 cloudflared 版本
+func (s *CloudflareTunnelService) GetCloudflaredVersion() (string, error) {
+	return s.manager.GetVersion()
+}
+
 
 // CreateTunnelRequest 创建隧道请求
 type CreateTunnelRequest struct {

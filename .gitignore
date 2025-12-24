@@ -17,6 +17,10 @@ backend/emby-proxy
 backend/main
 /server
 
+# cloudflared 二进制文件（运行时下载）
+bin/
+backend/bin/
+
 # Go 安装包
 *.tar.gz
 
