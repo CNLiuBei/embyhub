@@ -49,6 +49,38 @@ fi
 
 echo ""
 
+# 停止 Emby 代理服务
+echo -e "${YELLOW}正在停止 Emby 代理服务...${NC}"
+
+# 检查PID文件
+EMBY_PID_FILE="./backend/logs/emby_proxy.pid"
+if [ -f "$EMBY_PID_FILE" ]; then
+    EMBY_PID=$(cat "$EMBY_PID_FILE" 2>/dev/null)
+    if [ -n "$EMBY_PID" ] && kill -0 "$EMBY_PID" 2>/dev/null; then
+        kill -15 "$EMBY_PID" 2>/dev/null || true
+        sleep 2
+        if kill -0 "$EMBY_PID" 2>/dev/null; then
+            kill -9 "$EMBY_PID" 2>/dev/null || true
+        fi
+        rm -f "$EMBY_PID_FILE"
+        echo -e "${GREEN}✓ Emby 代理服务已停止 (PID: $EMBY_PID)${NC}"
+    fi
+fi
+
+# 停止所有 emby-proxy 进程
+EMBY_PIDS=$(pgrep -f "cmd/emby-proxy/main")
+if [ -n "$EMBY_PIDS" ]; then
+    echo -e "${YELLOW}停止残留 Emby 代理进程: $EMBY_PIDS${NC}"
+    kill -15 $EMBY_PIDS 2>/dev/null || true
+    sleep 1
+    pkill -9 -f "cmd/emby-proxy/main" 2>/dev/null || true
+    echo -e "${GREEN}✓ 所有 Emby 代理进程已停止${NC}"
+else
+    echo -e "${BLUE}  Emby 代理服务未运行${NC}"
+fi
+
+echo ""
+
 # 停止前端服务
 echo -e "${YELLOW}正在停止前端服务...${NC}"
 

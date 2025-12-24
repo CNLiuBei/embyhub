@@ -115,9 +115,48 @@ fi
 
 echo ""
 
+# 启动 Emby 代理服务
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}[2/3] 🎬 启动 Emby 代理服务${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# 停止旧的 emby-proxy 进程
+if pgrep -f "cmd/emby-proxy/main" >/dev/null 2>&1; then
+    echo -e "${YELLOW}🛑 停止旧的 Emby 代理服务...${NC}"
+    pkill -15 -f "cmd/emby-proxy/main" 2>/dev/null || true
+    sleep 2
+    pkill -9 -f "cmd/emby-proxy/main" 2>/dev/null || true
+    sleep 1
+fi
+
+# 清理端口占用
+if lsof -ti:54682 >/dev/null 2>&1; then
+    echo -e "${YELLOW}🧹 清理端口54682占用...${NC}"
+    lsof -ti:54682 | xargs kill -9 2>/dev/null || true
+    sleep 1
+fi
+
+# 启动 Emby 代理服务
+echo -e "${CYAN}⏳ 启动 Emby 代理服务...${NC}"
+nohup go run cmd/emby-proxy/main.go > logs/emby_proxy_$(date +%Y%m%d_%H%M%S).log 2>&1 &
+EMBY_PROXY_PID=$!
+echo $EMBY_PROXY_PID > logs/emby_proxy.pid
+
+# 等待启动
+sleep 3
+
+# 检查是否启动成功
+if ps -p $EMBY_PROXY_PID > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Emby 代理服务启动成功 (PID: $EMBY_PROXY_PID)${NC}"
+else
+    echo -e "${YELLOW}⚠️  Emby 代理服务可能还在启动中...${NC}"
+fi
+
+echo ""
+
 # 启动前端
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}[2/2] 🎨 启动前端服务${NC}"
+echo -e "${BLUE}[3/3] 🎨 启动前端服务${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 cd "${FRONTEND_DIR}" || exit 1
 

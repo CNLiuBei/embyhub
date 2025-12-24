@@ -37,7 +37,7 @@ services:
 
   # 后端服务
   backend:
-    image: ghcr.io/cnliubei/embyhub-backend:latest
+    image: registry.cn-hangzhou.aliyuncs.com/lightsail/embyhub-backend:latest
     container_name: embyhub-backend
     restart: always
     depends_on:
@@ -58,7 +58,7 @@ services:
 
   # 前端服务
   frontend:
-    image: ghcr.io/cnliubei/embyhub-frontend:latest
+    image: registry.cn-hangzhou.aliyuncs.com/lightsail/embyhub-frontend:latest
     container_name: embyhub-frontend
     restart: always
     depends_on:
@@ -68,11 +68,29 @@ services:
     networks:
       - embyhub-network
 
+  # Emby代理服务
+  emby-proxy:
+    image: registry.cn-hangzhou.aliyuncs.com/lightsail/embyhub-emby-proxy:latest
+    container_name: embyhub-emby-proxy
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - emby_proxy_logs:/app/logs
+    ports:
+      - "54682:54682"
+    networks:
+      - embyhub-network
+
 volumes:
   postgres_data:
   redis_data:
   backend_logs:
   backend_uploads:
+  emby_proxy_logs:
 
 networks:
   embyhub-network:

@@ -12,6 +12,19 @@
 - 💬 **社区功能** - 论坛、私信、关注
 - 🔒 **安全特性** - JWT认证、接口限流、IP黑名单
 
+## GitHub Actions 自动构建
+
+推送代码到 GitHub 后会自动触发构建，需要在仓库 Settings → Secrets 中配置：
+
+| Secret 名称 | 说明 |
+|------------|------|
+| ALIYUN_REGISTRY_USERNAME | 阿里云镜像仓库用户名 |
+| ALIYUN_REGISTRY_PASSWORD | 阿里云镜像仓库密码 |
+
+构建产物：
+- 多平台二进制文件 (linux/darwin/windows, amd64/arm64)
+- Docker 镜像推送到 GHCR 和阿里云镜像仓库
+
 ## 快速部署 (Docker)
 
 ### 1. 创建目录
@@ -94,10 +107,10 @@ docker compose ps
 
 ```bash
 # 备份数据库
-docker exec embyhub-postgres pg_dump -U fnuser feiniu_user > backup.sql
+docker exec embyhub-postgres pg_dump -U embyhub embyhub > backup.sql
 
 # 恢复数据库
-cat backup.sql | docker exec -i embyhub-postgres psql -U fnuser feiniu_user
+cat backup.sql | docker exec -i embyhub-postgres psql -U embyhub embyhub
 ```
 
 ## 技术栈
@@ -163,8 +176,8 @@ GET /api/external/card/fetch?api_key=xxx&type=month
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | DB_HOST | 数据库地址 | postgres |
-| DB_USER | 数据库用户 | fnuser |
-| DB_PASSWORD | 数据库密码 | fnuser123 |
+| DB_USER | 数据库用户 | embyhub |
+| DB_PASSWORD | 数据库密码 | embyhub123 |
 | REDIS_HOST | Redis地址 | redis |
 
 ## License
