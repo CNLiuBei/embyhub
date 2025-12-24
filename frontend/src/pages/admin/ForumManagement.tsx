@@ -480,7 +480,7 @@ const ForumManagement = () => {
                       <p>用户发帖和评论时上传的图片会自动存储到 Telegram 图床，不占用服务器空间。</p>
                       <p className="mt-1">需要先部署 Telegram 图床服务，详见项目文档。</p>
                     </div>
-                    <Form form={imageHostForm} layout="vertical">
+                    <Form form={imageHostForm} layout="vertical" name="imageHostSettingsForm">
                       <Form.Item
                         name="enabled"
                         label="启用图床"
@@ -526,7 +526,7 @@ const ForumManagement = () => {
         }}
         confirmLoading={createNodeMutation.isPending || updateNodeMutation.isPending}
       >
-        <Form form={nodeForm} layout="vertical">
+        <Form form={nodeForm} layout="vertical" name="forumNodeForm">
           <Form.Item
             name="name"
             label="名称"

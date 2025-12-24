@@ -142,7 +142,7 @@ const IPBlacklist = () => {
         onCancel={() => setModalOpen(false)}
         confirmLoading={addMutation.isPending}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} name="ipBlacklistForm" layout="vertical">
           <Form.Item 
             name="ip" 
             label="IP地址" 

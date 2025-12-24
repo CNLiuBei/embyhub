@@ -918,4 +918,31 @@ export const forumAdminApi = {
     api.delete(`/admin/forum/comment/${id}`),
 }
 
+// 外部卡密API设置（管理员）
+export const externalCardApi = {
+  // 获取设置
+  getSettings: () =>
+    api.get('/admin/settings/external-card-api'),
+  
+  // 保存设置
+  saveSettings: (data: { 
+    enabled: boolean
+    api_key: string
+    api_keys?: Array<{ id: string; name: string; key: string; enabled: boolean; created_at: string; last_used_at?: string }>
+    allowed_ips: string
+    rate_limit: number
+    default_type: number
+    log_enabled: boolean 
+  }) =>
+    api.put('/admin/settings/external-card-api', data),
+  
+  // 生成新的API密钥
+  generateAPIKey: () =>
+    api.post('/admin/settings/external-card-api/generate-key'),
+  
+  // 获取API日志
+  getLogs: (params: { page: number; page_size: number }) =>
+    api.get('/admin/external-card-api/logs', { params }),
+}
+
 export default api

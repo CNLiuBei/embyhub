@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId } from 'react'
 import { Card, Form, Input, InputNumber, Switch, Button, Divider, Space, Alert, Collapse, App, Tag, Tabs, Radio, Upload } from 'antd'
 import { MailOutlined, SendOutlined, SaveOutlined, QuestionCircleOutlined, GlobalOutlined, PlusOutlined, SettingOutlined, UserAddOutlined, PlayCircleOutlined, ApiOutlined, HomeOutlined, UploadOutlined, PictureOutlined } from '@ant-design/icons'
 import { adminApi } from '../../services/api'
@@ -46,6 +46,9 @@ interface SiteSettings {
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('site')
+  
+  // 使用唯一ID避免StrictMode双重渲染导致的重复ID警告
+  const formId = useId()
   
   const [emailLoading, setEmailLoading] = useState(false)
   const [emailSaving, setEmailSaving] = useState(false)
@@ -370,7 +373,7 @@ const Settings = () => {
                 form={siteForm} 
                 layout="vertical" 
                 className="max-w-2xl"
-                name="siteSettingsForm"
+                name={`siteSettingsForm${formId}`}
                 initialValues={{ 
                   title: 'EmbyHub - 用户管理系统',
                   description: 'EmbyHub用户管理系统',
@@ -558,7 +561,7 @@ const Settings = () => {
                 className="mb-6"
               />
 
-              <Form form={domainForm} layout="vertical" className="max-w-2xl" name="domainSettingsForm" initialValues={{ enabled: false, domains: [] }}>
+              <Form form={domainForm} layout="vertical" className="max-w-2xl" name={`domainSettingsForm${formId}`} initialValues={{ enabled: false, domains: [] }}>
                 <Form.Item name="domain_enabled" label="启用域名白名单" valuePropName="checked">
                   <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                 </Form.Item>
@@ -685,7 +688,7 @@ const Settings = () => {
                 className="mb-6"
               />
 
-              <Form form={emailForm} layout="vertical" className="max-w-2xl" name="emailSettingsForm">
+              <Form form={emailForm} layout="vertical" className="max-w-2xl" name={`emailSettingsForm${formId}`}>
                 <Form.Item name="email_enabled" label="启用邮件服务" valuePropName="checked">
                   <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                 </Form.Item>
@@ -787,7 +790,7 @@ const Settings = () => {
                 form={registerForm} 
                 layout="vertical" 
                 className="max-w-2xl"
-                name="registerSettingsForm" 
+                name={`registerSettingsForm${formId}`} 
                 initialValues={{ register_enabled: true, gift_member_days: 0, auto_disable_on_exp: true }}
               >
                 <Form.Item name="register_enabled" label="允许用户注册" valuePropName="checked">
@@ -876,7 +879,7 @@ const Settings = () => {
                 form={embyForm} 
                 layout="vertical" 
                 className="max-w-2xl"
-                name="embySettingsForm"
+                name={`embySettingsForm${formId}`}
                 initialValues={{ emby_enabled: false, mode: 'emby', base_url: 'http://localhost:8096' }}
               >
                 <Form.Item name="emby_enabled" label="启用媒体服务" valuePropName="checked">
@@ -975,7 +978,7 @@ const Settings = () => {
         activeKey={activeTab}
         onChange={setActiveTab}
         size="large"
-        destroyInactiveTabPane
+        destroyOnHidden
       />
     </Card>
   )

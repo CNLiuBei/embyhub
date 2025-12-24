@@ -91,6 +91,7 @@ func autoMigrate() error {
 		&models.UserVip{},
 		&models.VipOrder{},
 		&models.BalanceLog{},
+		&models.MemberChangeLog{}, // 统一会员变动记录表
 		// 公告表
 		&models.Announcement{},
 		// IP黑名单表
@@ -120,6 +121,19 @@ func autoMigrate() error {
 		&models.Conversation{},
 		&models.UserFollow{},
 		&models.UserBlacklist{},
+		// 外部API日志表
+		&models.ExternalAPILog{},
+		// 闲管家虚拟货源对接表
+		&models.GoofishConfig{},
+		&models.GoofishGoods{},
+		&models.GoofishOrder{},
+		&models.GoofishOrderCard{},
+		&models.GoofishGoodsSubscription{},
+		&models.GoofishLog{},
+		// 支付宝支付相关表
+		&models.AlipayConfig{},
+		&models.AlipayLog{},
+		&models.AlipayVipOrder{},
 	)
 }
 

@@ -140,7 +140,7 @@ const Register = () => {
         <h2 className="text-center text-2xl font-bold text-gray-800 mb-2">创建账户</h2>
         <p className="text-center text-gray-500 mb-6">加入 {brandName}，开启精彩之旅</p>
         
-        <Form form={form} onFinish={handleSubmit} size="large" initialValues={{ emailPrefix: '', emailDomain: 'qq.com', invite_code: inviteCode }}>
+        <Form form={form} name="registerForm" onFinish={handleSubmit} size="large" initialValues={{ emailPrefix: '', emailDomain: 'qq.com', invite_code: inviteCode }}>
           <Form.Item name="username" rules={[
             { required: true, message: '请输入账号' },
             { min: 4, message: '账号至少4个字符' },

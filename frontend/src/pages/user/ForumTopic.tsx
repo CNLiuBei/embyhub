@@ -585,7 +585,7 @@ const ForumTopic = () => {
         confirmLoading={updateMutation.isPending}
         width={800}
       >
-        <Form form={editForm} layout="vertical">
+        <Form form={editForm} name="editTopicDetailForm" layout="vertical">
           <Form.Item
             name="title"
             label="标题"

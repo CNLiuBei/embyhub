@@ -48,6 +48,16 @@ const EmbyDeviceManagement = lazy(() => import('./pages/admin/EmbyDeviceManageme
 const PointsManagement = lazy(() => import('./pages/admin/PointsManagement'))
 const RechargeLinks = lazy(() => import('./pages/admin/RechargeLinks'))
 const ForumManagement = lazy(() => import('./pages/admin/ForumManagement'))
+const ExternalCardAPI = lazy(() => import('./pages/admin/ExternalCardAPI'))
+
+// 闲管家对接页面
+const GoofishSettings = lazy(() => import('./pages/admin/Goofish/GoofishSettings'))
+const GoofishGoods = lazy(() => import('./pages/admin/Goofish/GoofishGoods'))
+const GoofishOrders = lazy(() => import('./pages/admin/Goofish/GoofishOrders'))
+const GoofishLogs = lazy(() => import('./pages/admin/Goofish/GoofishLogs'))
+
+// 支付宝配置页面
+const AlipaySettings = lazy(() => import('./pages/admin/AlipaySettings'))
 
 // 加载指示器
 const PageLoading = () => (
@@ -126,6 +136,12 @@ function App() {
             <Route path="points" element={<PointsManagement />} />
             <Route path="recharge-links" element={<RechargeLinks />} />
             <Route path="forum" element={<ForumManagement />} />
+            <Route path="external-api" element={<ExternalCardAPI />} />
+            <Route path="goofish/settings" element={<GoofishSettings />} />
+            <Route path="goofish/goods" element={<GoofishGoods />} />
+            <Route path="goofish/orders" element={<GoofishOrders />} />
+            <Route path="goofish/logs" element={<GoofishLogs />} />
+            <Route path="alipay" element={<AlipaySettings />} />
             <Route path="logs" element={<OperationLogs />} />
             <Route path="settings" element={<Settings />} />
           </Route>

@@ -723,7 +723,7 @@ const UserDetail = () => {
         onOk={() => form.submit()}
         confirmLoading={resetPasswordMutation.isPending}
       >
-        <Form form={form} onFinish={(v) => resetPasswordMutation.mutate(v.password)}>
+        <Form form={form} name="resetPasswordForm" onFinish={(v) => resetPasswordMutation.mutate(v.password)}>
           <Form.Item name="password" label="新密码" rules={[{ required: true, min: 8 }]}>
             <Input.Password placeholder="请输入新密码(至少8位)" />
           </Form.Item>
@@ -738,7 +738,7 @@ const UserDetail = () => {
         onOk={() => memberForm.submit()}
         confirmLoading={setMemberMutation.isPending}
       >
-        <Form form={memberForm} onFinish={(v) => setMemberMutation.mutate(v)} layout="vertical">
+        <Form form={memberForm} name="setMemberForm" onFinish={(v) => setMemberMutation.mutate(v)} layout="vertical">
           <Form.Item label="快捷选择">
             <Space wrap>
               <Button size="small" onClick={() => memberForm.setFieldValue('days', 7)}>7天</Button>
@@ -791,6 +791,7 @@ const UserDetail = () => {
       >
         <Form 
           form={streamLimitForm} 
+          name="streamLimitForm"
           onFinish={(v) => setStreamLimitMutation.mutate(v.limit)} 
           layout="vertical"
         >
@@ -824,6 +825,7 @@ const UserDetail = () => {
       >
         <Form 
           form={pointsForm} 
+          name="adjustPointsForm"
           onFinish={(v) => adjustPointsMutation.mutate(v)} 
           layout="vertical"
         >

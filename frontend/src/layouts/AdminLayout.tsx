@@ -21,6 +21,8 @@ import {
   TrophyOutlined,
   ShoppingCartOutlined,
   CommentOutlined,
+  ApiOutlined,
+  AlipayCircleOutlined,
 } from '@ant-design/icons'
 import UserAvatar from '../components/UserAvatar'
 import { logout } from '../store/authSlice'
@@ -69,6 +71,19 @@ const AdminLayout = () => {
     { key: '/admin/points', icon: <TrophyOutlined />, label: '积分管理' },
     { key: '/admin/forum', icon: <CommentOutlined />, label: '论坛管理' },
     { key: '/admin/invite', icon: <GiftOutlined />, label: '邀请码' },
+    { key: '/admin/external-api', icon: <ApiOutlined />, label: '外部API' },
+    { key: '/admin/alipay', icon: <AlipayCircleOutlined />, label: '支付宝配置' },
+    { 
+      key: 'goofish', 
+      icon: <ShoppingCartOutlined />, 
+      label: '闲管家对接',
+      children: [
+        { key: '/admin/goofish/settings', label: '对接配置' },
+        { key: '/admin/goofish/goods', label: '商品映射' },
+        { key: '/admin/goofish/orders', label: '订单管理' },
+        { key: '/admin/goofish/logs', label: 'API日志' },
+      ],
+    },
     { key: '/admin/announcements', icon: <NotificationOutlined />, label: '公告管理' },
     { key: '/admin/ip-blacklist', icon: <StopOutlined />, label: 'IP黑名单' },
     { key: '/admin/system', icon: <MonitorOutlined />, label: '系统监控' },

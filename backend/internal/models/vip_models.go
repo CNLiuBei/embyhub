@@ -10,10 +10,11 @@ import (
 // VipPlan 会员套餐表
 type VipPlan struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
-	Name         string    `gorm:"type:varchar(50);not null" json:"name"` // 套餐名称
-	Price        int64     `gorm:"not null" json:"price"`                 // 价格（分）
-	DurationDays int       `gorm:"not null" json:"duration_days"`         // 会员天数
-	IsActive     bool      `gorm:"default:true" json:"is_active"`         // 是否启用
+	Name         string    `gorm:"type:varchar(50);not null" json:"name"`        // 套餐名称
+	Description  string    `gorm:"type:varchar(200)" json:"description"`         // 套餐描述
+	Price        int64     `gorm:"not null" json:"price"`                        // 价格（分）
+	DurationDays int       `gorm:"not null" json:"duration_days"`                // 会员天数
+	IsActive     bool      `gorm:"default:true" json:"is_active"`                // 是否启用
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -88,5 +89,61 @@ func (BalanceLog) TableName() string {
 
 // 余额流水类型常量
 const (
-	BalanceTypeVipPurchase = "vip_purchase" // VIP购买
+	BalanceTypeVipPurchase       = "vip_purchase"        // VIP购买（通用）
+	BalanceTypeAlipayVipPurchase = "alipay_vip_purchase" // 支付宝VIP购买
 )
+
+// ============= 统一会员变动记录 =============
+
+// 会员变动来源类型
+const (
+	MemberSourceAlipay  = "alipay"  // 支付宝支付
+	MemberSourceBalance = "balance" // 余额支付
+	MemberSourceCard    = "card"    // 卡密兑换
+	MemberSourcePoints  = "points"  // 积分兑换
+	MemberSourceAdmin   = "admin"   // 管理员手动
+	MemberSourceInvite  = "invite"  // 邀请奖励
+	MemberSourceGoofish = "goofish" // 闲鱼购买
+)
+
+// MemberChangeLog 会员变动记录表（统一记录所有会员时间变动）
+type MemberChangeLog struct {
+	ID             uint64     `gorm:"primaryKey" json:"id"`
+	UserID         uuid.UUID  `gorm:"type:uuid;index;not null" json:"user_id"`       // 用户ID
+	Source         string     `gorm:"type:varchar(32);not null;index" json:"source"` // 变动来源
+	OrderNo        string     `gorm:"type:varchar(64);index" json:"order_no"`        // 关联订单号/卡密码
+	ChangeDays     int        `gorm:"not null" json:"change_days"`                   // 变动天数（正数增加，负数减少）
+	Amount         int64      `gorm:"default:0" json:"amount"`                       // 支付金额（分，0表示免费）
+	BeforeExpireAt *time.Time `gorm:"type:timestamp" json:"before_expire_at"`        // 变动前到期时间
+	AfterExpireAt  *time.Time `gorm:"type:timestamp" json:"after_expire_at"`         // 变动后到期时间
+	Remark         string     `gorm:"type:varchar(255)" json:"remark"`               // 备注
+	OperatorID     *uuid.UUID `gorm:"type:uuid" json:"operator_id"`                  // 操作人ID（管理员操作时）
+	CreatedAt      time.Time  `json:"created_at"`
+}
+
+// TableName 指定表名
+func (MemberChangeLog) TableName() string {
+	return "member_change_logs"
+}
+
+// GetSourceName 获取来源名称
+func (m *MemberChangeLog) GetSourceName() string {
+	switch m.Source {
+	case MemberSourceAlipay:
+		return "支付宝支付"
+	case MemberSourceBalance:
+		return "余额支付"
+	case MemberSourceCard:
+		return "卡密兑换"
+	case MemberSourcePoints:
+		return "积分兑换"
+	case MemberSourceAdmin:
+		return "管理员操作"
+	case MemberSourceInvite:
+		return "邀请奖励"
+	case MemberSourceGoofish:
+		return "闲鱼购买"
+	default:
+		return "未知"
+	}
+}

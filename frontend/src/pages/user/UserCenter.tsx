@@ -487,7 +487,7 @@ const UserCenter = () => {
         onCancel={() => setEditModalOpen(false)}
         footer={null}
       >
-        <Form form={editForm} onFinish={handleEditSubmit} layout="vertical" className="mt-4">
+        <Form form={editForm} name="editProfileForm" onFinish={handleEditSubmit} layout="vertical" className="mt-4">
           <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}>
             <Input placeholder="请输入昵称" prefix={<UserOutlined className="text-gray-400" />} />
           </Form.Item>
@@ -513,7 +513,7 @@ const UserCenter = () => {
         onCancel={() => setPasswordModalOpen(false)}
         footer={null}
       >
-        <Form form={passwordForm} onFinish={handlePasswordSubmit} layout="vertical" className="mt-4">
+        <Form form={passwordForm} name="changePasswordForm" onFinish={handlePasswordSubmit} layout="vertical" className="mt-4">
           <Form.Item name="old_password" label="原密码" rules={[{ required: true, message: '请输入原密码' }]}>
             <Input.Password placeholder="请输入原密码" prefix={<LockOutlined className="text-gray-400" />} />
           </Form.Item>
@@ -541,7 +541,7 @@ const UserCenter = () => {
         onCancel={() => setEmailModalOpen(false)}
         footer={null}
       >
-        <Form form={emailForm} onFinish={handleEmailSubmit} layout="vertical" className="mt-4">
+        <Form form={emailForm} name="changeEmailForm" onFinish={handleEmailSubmit} layout="vertical" className="mt-4">
           <Form.Item label="当前邮箱">
             <Input value={user?.email || '未绑定'} disabled prefix={<MailOutlined className="text-gray-400" />} />
           </Form.Item>

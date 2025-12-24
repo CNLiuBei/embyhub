@@ -1,20 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSelector } from 'react-redux'
-import { Button, Tag, Table, Modal, Input, App, Space, Progress, Dropdown } from 'antd'
-import { CrownOutlined, CheckCircleOutlined, GiftOutlined, ClockCircleOutlined, CalendarOutlined, ShoppingCartOutlined, DownOutlined } from '@ant-design/icons'
+import { useSelector, useDispatch } from 'react-redux'
+import { Button, Tag, Table, Modal, Input, App, Space, Progress, Dropdown, Card, Spin } from 'antd'
+import { CrownOutlined, CheckCircleOutlined, GiftOutlined, ClockCircleOutlined, CalendarOutlined, ShoppingCartOutlined, DownOutlined, AlipayCircleOutlined } from '@ant-design/icons'
 import { RootState } from '../../store'
-import { cardApi, publicApi } from '../../services/api'
+import { updateUser } from '../../store/authSlice'
+import { cardApi, publicApi, userApi } from '../../services/api'
+import { paymentApi, VipPlan, MemberChangeLog } from '../../services/paymentApi'
+import PaymentQRModal from '../../components/PaymentQRModal'
 import dayjs from 'dayjs'
 import type { MenuProps } from 'antd'
-
-interface RedeemHistory {
-  id: number
-  code: string
-  card_type: number
-  duration: number
-  redeemed_at: string
-}
 
 interface RechargeLink {
   card_type: number
@@ -23,13 +18,53 @@ interface RechargeLink {
   enabled: boolean
 }
 
+// 来源颜色映射
+const sourceColorMap: Record<string, string> = {
+  alipay: 'blue',
+  balance: 'green',
+  card: 'orange',
+  points: 'purple',
+  admin: 'red',
+  invite: 'cyan',
+  goofish: 'gold',
+}
+
 const MemberCenter = () => {
   const { message } = App.useApp()
   const { user } = useSelector((state: RootState) => state.auth)
+  const dispatch = useDispatch()
   const queryClient = useQueryClient()
+  
+  // 页面加载时获取最新用户信息
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await userApi.getInfo()
+        const userData = response.data.data
+        dispatch(updateUser({
+          member_expire: userData.member_expire,
+          member_level: userData.member_level,
+          role: userData.role,
+        }))
+      } catch {
+        // 忽略错误
+      }
+    }
+    fetchUserInfo()
+  }, [dispatch])
   
   // 弹窗状态
   const [redeemModalOpen, setRedeemModalOpen] = useState(false)
+  const [alipayModalOpen, setAlipayModalOpen] = useState(false)
+  const [paymentQRModalOpen, setPaymentQRModalOpen] = useState(false)
+  
+  // 支付信息
+  const [paymentInfo, setPaymentInfo] = useState<{
+    orderNo: string
+    qrCode: string
+    amount: number
+    planName: string
+  } | null>(null)
   
   // 表单状态
   const [cardCode, setCardCode] = useState('')
@@ -40,9 +75,9 @@ const MemberCenter = () => {
 
 
   const { data: historyData } = useQuery({
-    queryKey: ['redeemHistory'],
+    queryKey: ['memberChangeLogs'],
     queryFn: async () => {
-      const response = await cardApi.getHistory({ page: 1, page_size: 10 })
+      const response = await paymentApi.getMemberChangeLogs({ page: 1, page_size: 10 })
       return response.data.data
     },
   })
@@ -56,6 +91,17 @@ const MemberCenter = () => {
     },
   })
 
+  // 获取VIP套餐列表
+  const { data: vipPlansData, isLoading: plansLoading } = useQuery({
+    queryKey: ['vipPlans'],
+    queryFn: async () => {
+      const response = await paymentApi.getVipPlans()
+      return response.data.data as VipPlan[]
+    },
+  })
+
+  const vipPlans = vipPlansData || []
+
   const rechargeLinks = rechargeLinksData?.links || []
   const hasRechargeLinks = rechargeLinks.length > 0
 
@@ -66,13 +112,42 @@ const MemberCenter = () => {
       message.success('兑换成功！会员已升级')
       setRedeemModalOpen(false)
       setCardCode('')
-      queryClient.invalidateQueries({ queryKey: ['redeemHistory'] })
+      queryClient.invalidateQueries({ queryKey: ['memberChangeLogs'] })
       window.location.reload()
     },
     onError: (err: Error) => {
       message.error(err.message || '兑换失败')
     },
   })
+
+  // 创建支付宝支付订单
+  const createPaymentMutation = useMutation({
+    mutationFn: (planId: number) => paymentApi.createAlipayPayment(planId),
+    onSuccess: (response, planId) => {
+      const data = response.data.data
+      const plan = vipPlans.find(p => p.id === planId)
+      setPaymentInfo({
+        orderNo: data.order_no,
+        qrCode: data.qr_code,
+        amount: data.amount,
+        planName: plan?.name || 'VIP会员',
+      })
+      setAlipayModalOpen(false)
+      setPaymentQRModalOpen(true)
+    },
+    onError: (err: Error) => {
+      message.error(err.message || '创建订单失败')
+    },
+  })
+
+  // 支付成功回调
+  const handlePaymentSuccess = () => {
+    message.success('支付成功！会员已开通')
+    queryClient.invalidateQueries({ queryKey: ['memberChangeLogs'] })
+    setTimeout(() => {
+      window.location.reload()
+    }, 1500)
+  }
 
 
 
@@ -98,31 +173,47 @@ const MemberCenter = () => {
   const daysLeft = getDaysLeft()
 
   const historyColumns = [
+    {
+      title: '来源',
+      dataIndex: 'source_name',
+      key: 'source_name',
+      width: 100,
+      render: (name: string, record: MemberChangeLog) => (
+        <Tag color={sourceColorMap[record.source] || 'default'}>{name}</Tag>
+      ),
+    },
     { 
-      title: '卡密码', 
-      dataIndex: 'card_code', 
-      key: 'card_code',
-      width: 200,
-      render: (code: string) => <code className="text-xs bg-gray-100 px-2 py-1 rounded">{code}</code>
-    },
-    {
-      title: '天数',
-      dataIndex: 'duration',
-      key: 'duration',
+      title: '天数', 
+      dataIndex: 'change_days', 
+      key: 'change_days',
       width: 80,
-      render: (days: number) => <Tag color="blue">{days}天</Tag>,
+      render: (days: number) => <Tag color={days > 0 ? 'green' : 'red'}>{days > 0 ? '+' : ''}{days}天</Tag>
     },
     {
-      title: '兑换时间',
-      dataIndex: 'redeem_time',
-      key: 'redeem_time',
-      width: 150,
-      render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm'),
+      title: '金额',
+      dataIndex: 'amount',
+      key: 'amount',
+      width: 80,
+      render: (amount: number) => amount > 0 ? `¥${(amount / 100).toFixed(2)}` : '-',
     },
     {
-      title: '到期时间',
-      dataIndex: 'expire_time',
-      key: 'expire_time',
+      title: '变动前到期',
+      dataIndex: 'before_expire_at',
+      key: 'before_expire_at',
+      width: 130,
+      render: (time: string | null) => time ? dayjs(time).format('YYYY-MM-DD') : '-',
+    },
+    {
+      title: '变动后到期',
+      dataIndex: 'after_expire_at',
+      key: 'after_expire_at',
+      width: 130,
+      render: (time: string | null) => time ? dayjs(time).format('YYYY-MM-DD') : '-',
+    },
+    {
+      title: '时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
       width: 150,
       render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm'),
     },
@@ -160,10 +251,21 @@ const MemberCenter = () => {
           </Space>
           {userRole < 2 && (
             <Space>
+              {/* 支付宝支付按钮 */}
+              {vipPlans.length > 0 && (
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<AlipayCircleOutlined />}
+                  onClick={() => setAlipayModalOpen(true)}
+                  style={{ background: '#1677ff' }}
+                >
+                  支付宝购买
+                </Button>
+              )}
               {hasRechargeLinks ? (
                 rechargeLinks.length === 1 ? (
                   <Button 
-                    type="primary" 
                     size="large" 
                     icon={<ShoppingCartOutlined />} 
                     onClick={() => window.open(rechargeLinks[0].url, '_blank')}
@@ -181,21 +283,12 @@ const MemberCenter = () => {
                     }}
                     placement="bottomRight"
                   >
-                    <Button type="primary" size="large" icon={<ShoppingCartOutlined />}>
+                    <Button size="large" icon={<ShoppingCartOutlined />}>
                       购买会员 <DownOutlined />
                     </Button>
                   </Dropdown>
                 )
-              ) : (
-                <Button 
-                  type="primary" 
-                  size="large" 
-                  icon={<ShoppingCartOutlined />} 
-                  onClick={() => message.info('请联系管理员获取购买链接')}
-                >
-                  购买会员
-                </Button>
-              )}
+              ) : null}
               <Button size="large" icon={<GiftOutlined />} onClick={() => setRedeemModalOpen(true)}>
                 兑换卡密
               </Button>
@@ -230,16 +323,16 @@ const MemberCenter = () => {
         </div>
       </div>
 
-      {/* 兑换记录 */}
+      {/* 续费记录 */}
       <div className="glass-card p-6 flex-1">
-        <div className="font-semibold mb-4">兑换记录</div>
+        <div className="font-semibold mb-4">续费记录</div>
         <Table
           columns={historyColumns}
-          dataSource={(historyData as { list: RedeemHistory[] })?.list || []}
+          dataSource={historyData?.list || []}
           rowKey="id"
           pagination={false}
           size="small"
-          locale={{ emptyText: '暂无兑换记录' }}
+          locale={{ emptyText: '暂无续费记录' }}
         />
       </div>
 
@@ -266,6 +359,77 @@ const MemberCenter = () => {
           </div>
         </div>
       </Modal>
+
+      {/* 支付宝套餐选择弹窗 */}
+      <Modal
+        title={
+          <Space>
+            <AlipayCircleOutlined style={{ color: '#1677ff', fontSize: 20 }} />
+            <span>选择VIP套餐</span>
+          </Space>
+        }
+        open={alipayModalOpen}
+        onCancel={() => setAlipayModalOpen(false)}
+        footer={null}
+        width={600}
+      >
+        {plansLoading ? (
+          <div className="text-center py-8">
+            <Spin size="large" />
+          </div>
+        ) : vipPlans.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            暂无可用套餐
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 py-4">
+            {vipPlans.map((plan) => (
+              <Card
+                key={plan.id}
+                hoverable
+                className="text-center"
+                onClick={() => createPaymentMutation.mutate(plan.id)}
+              >
+                <div className="mb-2">
+                  <CrownOutlined style={{ fontSize: 32, color: '#faad14' }} />
+                </div>
+                <div className="text-lg font-bold mb-1">{plan.name}</div>
+                <div className="text-gray-500 text-sm mb-2">{plan.description}</div>
+                <div className="text-2xl font-bold text-red-500 mb-1">
+                  ¥{(plan.price / 100).toFixed(2)}
+                </div>
+                <div className="text-gray-400 text-xs">
+                  {plan.duration_days}天会员
+                </div>
+                <Button
+                  type="primary"
+                  className="mt-3"
+                  loading={createPaymentMutation.isPending}
+                  icon={<AlipayCircleOutlined />}
+                >
+                  立即购买
+                </Button>
+              </Card>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      {/* 支付二维码弹窗 */}
+      {paymentInfo && (
+        <PaymentQRModal
+          open={paymentQRModalOpen}
+          onClose={() => {
+            setPaymentQRModalOpen(false)
+            setPaymentInfo(null)
+          }}
+          orderNo={paymentInfo.orderNo}
+          qrCode={paymentInfo.qrCode}
+          amount={paymentInfo.amount}
+          planName={paymentInfo.planName}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
 
     </div>
   )

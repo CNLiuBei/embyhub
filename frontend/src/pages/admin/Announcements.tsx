@@ -217,7 +217,7 @@ const Announcements = () => {
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         width={600}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} name="announcementForm" layout="vertical">
           <Form.Item name="title" label="标题" rules={[{ required: true, message: '请输入标题' }]}>
             <Input placeholder="请输入公告标题" />
           </Form.Item>

@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // VipPurchaseService VIP购买服务
@@ -102,29 +103,52 @@ func (s *VipPurchaseService) PurchaseVip(req *PurchaseVipRequest) (*PurchaseVipR
 			return fmt.Errorf("记录余额流水失败: %w", err)
 		}
 
-		// 9. 获取用户VIP信息（带行锁）
-		userVip, err := s.vipRepo.GetUserVipWithLock(tx, req.UserID)
-		if err != nil {
-			return fmt.Errorf("查询用户VIP信息失败: %w", err)
+		// 9. 获取用户当前会员状态（从 users 表，带行锁）
+		var user models.User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id, member_expire, member_level").
+			Where("id = ?", req.UserID).
+			First(&user).Error; err != nil {
+			return fmt.Errorf("查询用户信息失败: %w", err)
 		}
+
+		beforeExpire := user.MemberExpire // 记录变动前的到期时间
 
 		// 10. 计算新的会员到期时间
-		newExpireAt := repository.CalculateNewExpireTime(userVip.VipExpireAt, plan.DurationDays)
-		userVip.VipExpireAt = &newExpireAt
-		userVip.UpdatedAt = time.Now().UTC()
+		newExpireAt := repository.CalculateNewExpireTime(user.MemberExpire, plan.DurationDays)
 
-		// 11. 更新用户VIP信息
-		if err := s.vipRepo.CreateOrUpdateUserVip(tx, userVip); err != nil {
-			return fmt.Errorf("更新VIP信息失败: %w", err)
+		// 11. 更新用户会员信息（统一使用 users 表）
+		if err := tx.Model(&models.User{}).Where("id = ?", req.UserID).Updates(map[string]interface{}{
+			"member_expire": newExpireAt,
+			"member_level":  models.MemberMonth,
+			"role":          models.RoleMember,
+			"status":        1,
+		}).Error; err != nil {
+			return fmt.Errorf("更新会员信息失败: %w", err)
 		}
 
-		// 12. 更新订单状态为成功
+		// 12. 记录会员变动日志
+		changeLog := models.MemberChangeLog{
+			UserID:         req.UserID,
+			Source:         models.MemberSourceBalance,
+			OrderNo:        orderNo,
+			ChangeDays:     plan.DurationDays,
+			Amount:         plan.Price,
+			BeforeExpireAt: beforeExpire,
+			AfterExpireAt:  &newExpireAt,
+			Remark:         fmt.Sprintf("余额购买VIP: %s", plan.Name),
+		}
+		if err := tx.Create(&changeLog).Error; err != nil {
+			return fmt.Errorf("记录会员变动失败: %w", err)
+		}
+
+		// 13. 更新订单状态为成功
 		order.Status = models.OrderStatusSuccess
 		if err := tx.Model(order).Where("order_no = ?", orderNo).Update("status", models.OrderStatusSuccess).Error; err != nil {
 			return fmt.Errorf("更新订单状态失败: %w", err)
 		}
 
-		// 13. 构造响应
+		// 14. 构造响应
 		response = &PurchaseVipResponse{
 			VipExpireAt: newExpireAt,
 			Balance:     afterBalance,
@@ -159,10 +183,10 @@ func (s *VipPurchaseService) GetVipPlans() ([]models.VipPlan, error) {
 	return plans, nil
 }
 
-// GetUserVipInfo 获取用户VIP信息
+// GetUserVipInfo 获取用户VIP信息（从 users 表读取）
 func (s *VipPurchaseService) GetUserVipInfo(userID uuid.UUID) (*models.UserVip, error) {
-	var userVip models.UserVip
-	err := s.db.Where("user_id = ?", userID).First(&userVip).Error
+	var user models.User
+	err := s.db.Select("id, member_expire").Where("id = ?", userID).First(&user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return &models.UserVip{
@@ -172,5 +196,8 @@ func (s *VipPurchaseService) GetUserVipInfo(userID uuid.UUID) (*models.UserVip, 
 		}
 		return nil, errors.New("查询VIP信息失败")
 	}
-	return &userVip, nil
+	return &models.UserVip{
+		UserID:      userID,
+		VipExpireAt: user.MemberExpire,
+	}, nil
 }

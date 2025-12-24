@@ -161,7 +161,7 @@ const ForgotPassword = () => {
           </Form>
         ) : (
           // 第二步：输入验证码和新密码
-          <Form form={form} onFinish={handleResetPassword} size="large">
+          <Form form={form} name="resetPasswordStepForm" onFinish={handleResetPassword} size="large">
             <div className="mb-4 p-3 bg-blue-50 rounded-xl text-sm text-blue-600">
               验证码已发送至 <span className="font-medium">{email}</span>
             </div>

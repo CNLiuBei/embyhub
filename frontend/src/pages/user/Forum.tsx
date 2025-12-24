@@ -476,7 +476,7 @@ const Forum = () => {
         confirmLoading={createMutation.isPending}
         width={800}
       >
-        <Form form={form} layout="vertical">
+        <Form form={form} name="createTopicForm" layout="vertical">
           <Form.Item
             name="node_id"
             label="选择板块"
@@ -525,7 +525,7 @@ const Forum = () => {
         confirmLoading={updateMutation.isPending}
         width={800}
       >
-        <Form form={editForm} layout="vertical">
+        <Form form={editForm} name="editTopicForm" layout="vertical">
           <Form.Item
             name="title"
             label="标题"

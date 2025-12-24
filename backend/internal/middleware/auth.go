@@ -160,11 +160,23 @@ func RequireMember(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// RateLimit 限流中间件（基于IP）
+// RateLimit 限流中间件（基于用户ID+路径，未登录则基于IP+路径）
 func RateLimit(limit int, window time.Duration, keyPrefix string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
-		key := keyPrefix + ip
+		path := c.FullPath() // 使用路由路径，如 /api/v1/payment/order/:order_no
+		var key string
+		
+		// 优先使用用户ID作为限流key
+		if userID, exists := c.Get("user_id"); exists {
+			if uid, ok := userID.(uuid.UUID); ok {
+				key = keyPrefix + "user:" + uid.String() + ":" + path
+			}
+		}
+		
+		// 如果没有用户ID，则使用IP
+		if key == "" {
+			key = keyPrefix + "ip:" + c.ClientIP() + ":" + path
+		}
 
 		ctx := context.Background()
 		count, err := database.IncrLimit(ctx, key, window)

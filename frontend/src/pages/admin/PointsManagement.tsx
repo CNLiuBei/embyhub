@@ -887,7 +887,7 @@ const PointsManagement = () => {
 
                   {/* 赠送表单 */}
                   <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
-                    <Form form={giftForm} layout="vertical" initialValues={{ target_type: 'all', send_notification: true }}>
+                    <Form form={giftForm} layout="vertical" name="pointsGiftForm" initialValues={{ target_type: 'all', send_notification: true }}>
                       {/* 基本信息 */}
                       <div className="text-gray-700 font-medium mb-3 flex items-center gap-2">
                         <GiftOutlined className="text-orange-500" /> 赠送信息
@@ -1129,7 +1129,7 @@ const PointsManagement = () => {
         onOk={handleRuleSubmit}
         confirmLoading={createRuleMutation.isPending || updateRuleMutation.isPending}
       >
-        <Form form={ruleForm} layout="vertical" className="mt-4">
+        <Form form={ruleForm} layout="vertical" name="pointsRuleForm" className="mt-4">
           <Form.Item name="name" label="规则名称" rules={[{ required: true, message: '请输入' }]}>
             <Input placeholder="如：天卡" className="h-10 rounded-lg" />
           </Form.Item>
@@ -1158,7 +1158,7 @@ const PointsManagement = () => {
         confirmLoading={createCardMutation.isPending}
         okText="生成"
       >
-        <Form form={cardForm} layout="vertical" className="mt-4">
+        <Form form={cardForm} layout="vertical" name="pointsCardForm" className="mt-4">
           <Form.Item name="points" label="积分面值" rules={[{ required: true, message: '请输入' }]}>
             <InputNumber min={1} max={100000} className="w-full h-10 rounded-lg" suffix="积分" placeholder="输入积分数量" />
           </Form.Item>
@@ -1205,7 +1205,7 @@ const PointsManagement = () => {
         confirmLoading={createGiftRuleMutation.isPending || updateGiftRuleMutation.isPending}
         width={600}
       >
-        <Form form={giftRuleForm} layout="vertical" className="mt-4">
+        <Form form={giftRuleForm} layout="vertical" name="pointsGiftRuleForm" className="mt-4">
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="name" label="规则名称" rules={[{ required: true, message: '请输入规则名称' }]}>

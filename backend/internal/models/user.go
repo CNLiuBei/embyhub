@@ -886,3 +886,23 @@ type UserFollow struct {
 func (UserFollow) TableName() string {
 	return "user_follows"
 }
+
+
+// ============= 外部API日志相关模型 =============
+
+// ExternalAPILog 外部API请求日志
+type ExternalAPILog struct {
+	ID        uint64    `gorm:"primaryKey" json:"id"`
+	IP        string    `gorm:"size:64" json:"ip"`
+	Method    string    `gorm:"size:16" json:"method"`
+	Path      string    `gorm:"size:256" json:"path"`
+	Params    string    `gorm:"type:text" json:"params"`
+	Response  string    `gorm:"type:text" json:"response"`
+	Status    int       `json:"status"`
+	Duration  int64     `json:"duration"` // 毫秒
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (ExternalAPILog) TableName() string {
+	return "external_api_logs"
+}

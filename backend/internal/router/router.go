@@ -66,6 +66,9 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 	pointsCardService := service.NewPointsCardService(db, pointsService)
 	forumService := service.NewForumService(db)
 	messageService := service.NewMessageService(db)
+	externalCardService := service.NewExternalCardService(db)
+	goofishService := service.NewGoofishService(db, cfg.JWT.Secret) // 使用JWT密钥作为加密密钥
+	alipayService := service.NewAlipayService(db, cfg.JWT.Secret)   // 支付宝服务
 
 	// 初始化处理器
 	userHandler := handler.NewUserHandler(userService)
@@ -91,6 +94,14 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 	pointsCardHandler := handler.NewPointsCardHandler(pointsCardService)
 	forumHandler := handler.NewForumHandler(forumService)
 	messageHandler := handler.NewPrivateMessageHandler(messageService)
+	externalCardHandler := handler.NewExternalCardHandler(externalCardService)
+	goofishHandler := handler.NewGoofishHandler(goofishService)
+	goofishAdminHandler := handler.NewGoofishAdminHandler(goofishService)
+	goofishSignMiddleware := middleware.NewGoofishSignMiddleware(goofishService)
+	paymentHandler := handler.NewPaymentHandler(alipayService)
+	alipayAdminHandler := handler.NewAlipayAdminHandler(alipayService)
+	cloudflareTunnelService := service.NewCloudflareTunnelService(db)
+	cloudflareTunnelHandler := handler.NewCloudflareTunnelHandler(cloudflareTunnelService)
 
 	// 初始化设置服务（提前初始化，因为公开接口也需要）
 	settingService := service.NewSettingService(db)
@@ -130,6 +141,9 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 
 		// 图床设置（公开接口，用于前端获取图床地址）
 		public.GET("/settings/image-host", settingHandler.GetImageHostSettingsPublic)
+
+		// 支付宝异步通知（公开接口，无需认证）
+		public.POST("/payment/alipay/notify", paymentHandler.AlipayNotify)
 	}
 
 	// 需要认证的接口
@@ -176,6 +190,16 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 			vip.GET("/plans", vipPurchaseHandler.GetVipPlans)     // 获取VIP套餐列表
 			vip.GET("/info", vipPurchaseHandler.GetUserVipInfo)   // 获取用户VIP信息
 			vip.POST("/purchase", vipPurchaseHandler.PurchaseVip) // 购买VIP
+		}
+
+		// 支付宝支付接口
+		payment := auth.Group("/payment")
+		{
+			payment.POST("/alipay/create", paymentHandler.CreateAlipayPayment) // 创建支付订单
+			payment.GET("/order/:order_no", paymentHandler.GetOrderStatus)     // 查询订单状态
+			payment.GET("/orders", paymentHandler.GetOrderList)                // 订单列表
+			payment.GET("/plans", paymentHandler.GetVipPlans)                  // VIP套餐列表
+			payment.GET("/member-logs", paymentHandler.GetMemberChangeLogs)    // 会员变动记录
 		}
 
 		// 媒体库接口 - 需要有效会员权限
@@ -487,6 +511,49 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 		admin.POST("/forum/topic/:id/top", forumHandler.AdminSetTopicTop)
 		admin.POST("/forum/topic/:id/recommend", forumHandler.AdminSetTopicRecommend)
 		admin.DELETE("/forum/comment/:id", forumHandler.AdminDeleteComment)
+
+		// 外部卡密API设置
+		admin.GET("/settings/external-card-api", externalCardHandler.GetSettings)
+		admin.PUT("/settings/external-card-api", externalCardHandler.SaveSettings)
+		admin.POST("/settings/external-card-api/generate-key", externalCardHandler.GenerateAPIKey)
+		admin.GET("/external-card-api/logs", externalCardHandler.GetAPILogs)
+
+		// 闲管家虚拟货源管理
+		admin.GET("/goofish/config", goofishAdminHandler.GetConfig)
+		admin.POST("/goofish/config", goofishAdminHandler.SaveConfig)
+		admin.GET("/goofish/goods", goofishAdminHandler.GetGoodsList)
+		admin.POST("/goofish/goods", goofishAdminHandler.CreateGoods)
+		admin.POST("/goofish/goods/auto-generate", goofishAdminHandler.AutoGenerateGoods)
+		admin.POST("/goofish/goods/notify-all", goofishAdminHandler.NotifyAllGoodsChange)
+		admin.PUT("/goofish/goods/:id", goofishAdminHandler.UpdateGoods)
+		admin.DELETE("/goofish/goods/:id", goofishAdminHandler.DeleteGoods)
+		admin.POST("/goofish/goods/:goods_no/notify", goofishAdminHandler.NotifyGoodsChange)
+		admin.GET("/goofish/orders", goofishAdminHandler.GetOrderList)
+		admin.GET("/goofish/orders/:order_no", goofishAdminHandler.GetOrderDetailAdmin)
+		admin.GET("/goofish/logs", goofishAdminHandler.GetAPILogs)
+		admin.POST("/goofish/logs/clean", goofishAdminHandler.CleanOldLogs)
+
+		// 支付宝配置管理
+		admin.GET("/alipay/config", alipayAdminHandler.GetConfig)
+		admin.PUT("/alipay/config", alipayAdminHandler.SaveConfig)
+		admin.POST("/alipay/test", alipayAdminHandler.TestConnection)
+		admin.GET("/alipay/logs", alipayAdminHandler.GetLogs)
+		// VIP套餐管理
+		admin.GET("/alipay/plans", alipayAdminHandler.GetVipPlans)
+		admin.POST("/alipay/plans", alipayAdminHandler.CreateVipPlan)
+		admin.PUT("/alipay/plans/:id", alipayAdminHandler.UpdateVipPlan)
+		admin.DELETE("/alipay/plans/:id", alipayAdminHandler.DeleteVipPlan)
+		admin.POST("/alipay/plans/:id/toggle", alipayAdminHandler.ToggleVipPlanStatus)
+
+		// Cloudflare 隧道管理
+		admin.GET("/tunnel/status", cloudflareTunnelHandler.GetStatus)
+		admin.GET("/tunnel/config", cloudflareTunnelHandler.GetConfig)
+		admin.POST("/tunnel/download", cloudflareTunnelHandler.DownloadCloudflared) // 下载 cloudflared
+		admin.POST("/tunnel/create", cloudflareTunnelHandler.CreateTunnel)
+		admin.POST("/tunnel/start", cloudflareTunnelHandler.StartTunnel)
+		admin.POST("/tunnel/stop", cloudflareTunnelHandler.StopTunnel)
+		admin.POST("/tunnel/restart", cloudflareTunnelHandler.RestartTunnel)
+		admin.DELETE("/tunnel", cloudflareTunnelHandler.DeleteTunnel)
 	}
 
 	// 健康检查
@@ -497,8 +564,43 @@ func Setup(cfg *config.Config, logger *zap.Logger) *gin.Engine {
 	// 域名检查接口（公开，不需要认证）
 	api.POST("/domain-check", domainHandler.CheckDomain)
 
+	// 外部卡密API（供第三方系统调用，使用API密钥认证）
+	// 同时支持GET和POST两种方式
+	external := r.Group("/api/external")
+	{
+		external.GET("/card/fetch", externalCardHandler.FetchCard)           // 获取卡密 - GET方式
+		external.POST("/card/fetch", externalCardHandler.FetchCard)          // 获取卡密 - POST方式
+		external.GET("/card/fetch/:type", externalCardHandler.FetchCardByType)  // 按类型获取卡密 - GET方式
+		external.POST("/card/fetch/:type", externalCardHandler.FetchCardByType) // 按类型获取卡密 - POST方式
+		external.GET("/card/stock", externalCardHandler.GetStock)            // 获取库存
+		
+		// 咸鱼系统专用API - 简化响应格式，code字段在顶层
+		// 支持咸鱼系统的所有参数: order_id, item_id, item_detail, order_amount, order_quantity, spec_name, spec_value, cookie_id, buyer_id
+		external.GET("/xianyu", externalCardHandler.XianyuAutoFetchCard)     // 咸鱼专用 - 自动识别类型
+		external.POST("/xianyu", externalCardHandler.XianyuAutoFetchCard)    // 咸鱼专用 - 自动识别类型
+		external.GET("/xianyu/:type", externalCardHandler.XianyuFetchCard)   // 咸鱼专用 - 指定类型
+		external.POST("/xianyu/:type", externalCardHandler.XianyuFetchCard)  // 咸鱼专用 - 指定类型
+	}
+
 	// 壁纸接口 (公开)
 	r.GET("/api/wallpaper", wallpaperHandler.GetWallpaper)
+
+	// 闲管家虚拟货源接口（公开，需签名验证）
+	goofish := r.Group("/goofish")
+	goofish.Use(goofishSignMiddleware.Verify())
+	goofish.Use(goofishSignMiddleware.LogResponse())
+	{
+		goofish.POST("/open/info", goofishHandler.GetPlatformInfo)           // 查询平台信息
+		goofish.POST("/user/info", goofishHandler.GetMerchantInfo)           // 查询商户信息
+		goofish.POST("/goods/list", goofishHandler.GetGoodsList)             // 查询商品列表
+		goofish.POST("/goods/detail", goofishHandler.GetGoodsDetail)         // 查询商品详情
+		goofish.POST("/order/purchase/create", goofishHandler.CreateKamiOrder) // 创建卡密订单
+		goofish.POST("/order/detail", goofishHandler.GetOrderDetail)         // 查询订单详情
+		// 商品订阅接口
+		goofish.POST("/goods/change/subscribe", goofishHandler.SubscribeGoods)           // 订阅商品变更通知
+		goofish.POST("/goods/change/unsubscribe", goofishHandler.UnsubscribeGoods)       // 取消商品变更通知
+		goofish.POST("/goods/change/subscribe/list", goofishHandler.GetSubscriptionList) // 查询商品订阅列表
+	}
 
 	// Emby反向代理（通过 /emby/* 访问Emby服务器）
 	// 支持客户端白名单控制
