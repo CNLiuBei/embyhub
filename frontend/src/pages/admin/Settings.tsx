@@ -790,20 +790,20 @@ const Settings = () => {
                 form={registerForm} 
                 layout="vertical" 
                 className="max-w-2xl"
-                name={`registerSettingsForm${formId}`} 
-                initialValues={{ register_enabled: true, gift_member_days: 0, auto_disable_on_exp: true }}
+                name={`registerSettingsForm${formId}`}
               >
                 <Form.Item name="register_enabled" label="允许用户注册" valuePropName="checked">
                   <Switch checkedChildren="开启" unCheckedChildren="关闭" />
                 </Form.Item>
 
                 <Form.Item 
-                  name="gift_member_days" 
                   label="注册赠送会员天数"
                   extra="设置为0表示不赠送会员，新用户需要使用卡密激活会员后才能登录"
                 >
                   <Space.Compact className="w-full">
-                    <InputNumber min={0} max={365} placeholder="0" className="flex-1" />
+                    <Form.Item name="gift_member_days" noStyle>
+                      <InputNumber min={0} max={365} placeholder="0" className="flex-1" />
+                    </Form.Item>
                     <Button disabled>天</Button>
                   </Space.Compact>
                 </Form.Item>
