@@ -38,7 +38,7 @@ services:
 
   # 后端服务
   backend:
-    image: ghcr.io/cnliubei/embyhub-backend:latest
+    image: registry.cn-hangzhou.aliyuncs.com/lightsail/embyhub-backend:latest
     container_name: embyhub-backend
     restart: unless-stopped
     depends_on:
@@ -68,7 +68,7 @@ services:
 
   # Emby代理服务
   emby-proxy:
-    image: ghcr.io/cnliubei/embyhub-emby-proxy:latest
+    image: registry.cn-hangzhou.aliyuncs.com/lightsail/embyhub-emby-proxy:latest
     container_name: embyhub-emby-proxy
     restart: unless-stopped
     depends_on:
@@ -94,7 +94,7 @@ services:
 
   # 前端服务
   frontend:
-    image: ghcr.io/cnliubei/embyhub-frontend:latest
+    image: registry.cn-hangzhou.aliyuncs.com/lightsail/embyhub-frontend:latest
     container_name: embyhub-frontend
     restart: unless-stopped
     depends_on:
